@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # taller-proyectos
 
 SafeSchool AI es un sistema académico de alerta temprana de bullying en versión sin IA. El proyecto está construido como monolito modular con arquitectura hexagonal estricta tanto en backend como en frontend.
@@ -303,3 +304,6 @@ Se dejó implementado:
 ## Nota operativa
 
 Para validar compilación, ejecución y pruebas en este entorno hace falta instalar dependencias con `npm install` en `backend` y `frontend`. Si el entorno no tiene PostgreSQL local disponible, el backend no podrá conectarse hasta que se configure una instancia accesible.
+=======
+# Taller-Procesos-01
+>>>>>>> 863922cbcd111a3017c42c50aab51d40d8bf0f74
