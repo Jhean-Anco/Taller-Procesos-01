@@ -7,8 +7,11 @@ interface PropiedadesPanelPagina {
 
 const tarjetas = [
   { clave: 'totalIncidencias', etiqueta: 'Incidencias' },
+  { clave: 'incidenciasEscaladas', etiqueta: 'Derivadas a directiva' },
+  { clave: 'incidenciasCriticas', etiqueta: 'Criticas' },
   { clave: 'incidenciasPendientes', etiqueta: 'Pendientes' },
   { clave: 'incidenciasEnEvaluacion', etiqueta: 'En evaluacion' },
+  { clave: 'reportesEvaluadosConIa', etiqueta: 'Evaluadas con IA' },
   { clave: 'procesosAdministrativos', etiqueta: 'Procesos iniciados' },
   { clave: 'procesosActivos', etiqueta: 'Procesos activos' },
   { clave: 'procesosCompletados', etiqueta: 'Procesos completados' },
@@ -28,9 +31,9 @@ export function PanelPagina({ panel, cargando }: PropiedadesPanelPagina) {
     <section className="space-y-6">
       <div className="rounded-[2rem] bg-gradient-to-r from-marca-800 via-marca-700 to-marca-500 p-8 text-white shadow-panel">
         <p className="text-sm uppercase tracking-[0.25em] text-marca-100">SafeSchool AI</p>
-        <h1 className="mt-3 text-4xl font-black">Panel administrativo de incidencias</h1>
+        <h1 className="mt-3 text-4xl font-black">Panel de alta directiva</h1>
         <p className="mt-4 max-w-3xl text-marca-50">
-          Seguimiento institucional de medidas operativas derivadas de incidencias anonimas.
+          Seguimiento institucional de medidas operativas derivadas por psicologia.
         </p>
       </div>
 
@@ -60,6 +63,19 @@ export function PanelPagina({ panel, cargando }: PropiedadesPanelPagina) {
         </article>
 
         <div className="grid gap-4">
+          <article className="rounded-3xl bg-white p-6 shadow-panel">
+            <h2 className="text-xl font-bold text-slate-800">Cobertura IA</h2>
+            <p className="mt-4 text-5xl font-black text-marca-700">
+              {panel.coberturaIa.toFixed(1)}%
+            </p>
+            <div className="mt-6 h-4 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-marca-500 to-acento-500"
+                style={{ width: `${Math.min(panel.coberturaIa, 100)}%` }}
+              />
+            </div>
+          </article>
+
           <article className="rounded-3xl bg-white p-6 shadow-panel">
             <h2 className="text-xl font-bold text-slate-800">Cumplimiento de procesos</h2>
             <p className="mt-4 text-5xl font-black text-marca-700">

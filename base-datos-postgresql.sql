@@ -1,4 +1,7 @@
-CREATE DATABASE safeschool_ai;
+SELECT 'CREATE DATABASE safeschool_ai'
+WHERE NOT EXISTS (
+  SELECT 1 FROM pg_database WHERE datname = 'safeschool_ai'
+)\gexec
 
 \c safeschool_ai;
 
@@ -32,6 +35,31 @@ CREATE TABLE IF NOT EXISTS encuestas_emocionales (
   nivel_animo INTEGER NOT NULL CHECK (nivel_animo BETWEEN 1 AND 5),
   nivel_seguridad INTEGER NOT NULL CHECK (nivel_seguridad BETWEEN 1 AND 5),
   puntaje_riesgo INTEGER NOT NULL DEFAULT 0 CHECK (puntaje_riesgo BETWEEN 0 AND 100),
+  grado SMALLINT NOT NULL DEFAULT 1 CHECK (grado IN (0, 1)),
+  zona_junin SMALLINT NOT NULL DEFAULT 1 CHECK (zona_junin IN (0, 1)),
+  recreo_solo SMALLINT NOT NULL DEFAULT 0 CHECK (recreo_solo IN (0, 1)),
+  animo_manana SMALLINT NOT NULL DEFAULT 0 CHECK (animo_manana IN (0, 1)),
+  miedo_participar SMALLINT NOT NULL DEFAULT 0 CHECK (miedo_participar IN (0, 1)),
+  redes_sociales SMALLINT NOT NULL DEFAULT 0 CHECK (redes_sociales IN (0, 1)),
+  apoyo_familiar SMALLINT NOT NULL DEFAULT 1 CHECK (apoyo_familiar IN (0, 1)),
+  rendimiento SMALLINT NOT NULL DEFAULT 0 CHECK (rendimiento IN (0, 1)),
+  habilidades_sociales SMALLINT NOT NULL DEFAULT 1 CHECK (habilidades_sociales IN (0, 1)),
+  entorno_violento SMALLINT NOT NULL DEFAULT 0 CHECK (entorno_violento IN (0, 1)),
+  evaluacion_ia_disponible BOOLEAN NOT NULL DEFAULT FALSE,
+  nivel_riesgo_ia VARCHAR(60) NULL,
+  prioridad_atencion_ia VARCHAR(30) NULL,
+  analisis_psicologico_ia TEXT NULL,
+  accion_recomendada_ia TEXT NULL,
+  factores_detectados_ia TEXT NULL,
+  factores_protectores_ia TEXT NULL,
+  prediccion_arbol INTEGER NULL CHECK (prediccion_arbol IS NULL OR prediccion_arbol IN (0, 1)),
+  sentimiento_texto_ia VARCHAR(30) NULL,
+  confianza_texto_ia DOUBLE PRECISION NULL CHECK (
+    confianza_texto_ia IS NULL OR confianza_texto_ia BETWEEN 0 AND 1
+  ),
+  confianza_global_ia DOUBLE PRECISION NULL CHECK (
+    confianza_global_ia IS NULL OR confianza_global_ia BETWEEN 0 AND 1
+  ),
   fecha_creacion TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_encuestas_estudiante
     FOREIGN KEY (estudiante_id)
@@ -39,6 +67,33 @@ CREATE TABLE IF NOT EXISTS encuestas_emocionales (
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 );
+
+ALTER TABLE encuestas_emocionales
+  ADD COLUMN IF NOT EXISTS grado SMALLINT NOT NULL DEFAULT 1 CHECK (grado IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS zona_junin SMALLINT NOT NULL DEFAULT 1 CHECK (zona_junin IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS recreo_solo SMALLINT NOT NULL DEFAULT 0 CHECK (recreo_solo IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS animo_manana SMALLINT NOT NULL DEFAULT 0 CHECK (animo_manana IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS miedo_participar SMALLINT NOT NULL DEFAULT 0 CHECK (miedo_participar IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS redes_sociales SMALLINT NOT NULL DEFAULT 0 CHECK (redes_sociales IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS apoyo_familiar SMALLINT NOT NULL DEFAULT 1 CHECK (apoyo_familiar IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS rendimiento SMALLINT NOT NULL DEFAULT 0 CHECK (rendimiento IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS habilidades_sociales SMALLINT NOT NULL DEFAULT 1 CHECK (habilidades_sociales IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS entorno_violento SMALLINT NOT NULL DEFAULT 0 CHECK (entorno_violento IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS evaluacion_ia_disponible BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS nivel_riesgo_ia VARCHAR(60) NULL,
+  ADD COLUMN IF NOT EXISTS prioridad_atencion_ia VARCHAR(30) NULL,
+  ADD COLUMN IF NOT EXISTS analisis_psicologico_ia TEXT NULL,
+  ADD COLUMN IF NOT EXISTS accion_recomendada_ia TEXT NULL,
+  ADD COLUMN IF NOT EXISTS factores_detectados_ia TEXT NULL,
+  ADD COLUMN IF NOT EXISTS factores_protectores_ia TEXT NULL,
+  ADD COLUMN IF NOT EXISTS prediccion_arbol INTEGER NULL CHECK (prediccion_arbol IS NULL OR prediccion_arbol IN (0, 1)),
+  ADD COLUMN IF NOT EXISTS sentimiento_texto_ia VARCHAR(30) NULL,
+  ADD COLUMN IF NOT EXISTS confianza_texto_ia DOUBLE PRECISION NULL CHECK (
+    confianza_texto_ia IS NULL OR confianza_texto_ia BETWEEN 0 AND 1
+  ),
+  ADD COLUMN IF NOT EXISTS confianza_global_ia DOUBLE PRECISION NULL CHECK (
+    confianza_global_ia IS NULL OR confianza_global_ia BETWEEN 0 AND 1
+  );
 
 CREATE TABLE IF NOT EXISTS alertas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -143,6 +198,15 @@ CREATE INDEX IF NOT EXISTS idx_encuestas_estudiante_id
 
 CREATE INDEX IF NOT EXISTS idx_encuestas_fecha_creacion
   ON encuestas_emocionales (fecha_creacion DESC);
+
+CREATE INDEX IF NOT EXISTS idx_encuestas_puntaje_riesgo
+  ON encuestas_emocionales (puntaje_riesgo);
+
+CREATE INDEX IF NOT EXISTS idx_encuestas_evaluacion_ia_disponible
+  ON encuestas_emocionales (evaluacion_ia_disponible);
+
+CREATE INDEX IF NOT EXISTS idx_encuestas_prioridad_atencion_ia
+  ON encuestas_emocionales (prioridad_atencion_ia);
 
 CREATE INDEX IF NOT EXISTS idx_alertas_estado
   ON alertas (estado);

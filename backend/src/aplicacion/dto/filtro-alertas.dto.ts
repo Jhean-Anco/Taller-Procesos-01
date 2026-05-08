@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class FiltroAlertasDto {
@@ -6,12 +7,14 @@ export class FiltroAlertasDto {
   estado?: 'pendiente' | 'evaluacion' | 'cerrada';
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(100)
   riesgoMinimo?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(100)

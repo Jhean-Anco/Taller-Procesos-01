@@ -6,19 +6,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { IniciarSesionServicio } from '../aplicacion/casos-uso/iniciar-sesion.servicio';
 import { IncidenciasAdministrativasServicio } from '../aplicacion/casos-uso/incidencias-administrativas.servicio';
 import { ObtenerPerfilActualServicio } from '../aplicacion/casos-uso/obtener-perfil-actual.servicio';
-import { RegistrarEstudianteServicio } from '../aplicacion/casos-uso/registrar-estudiante.servicio';
 import { RegistrarEncuestaServicio } from '../aplicacion/casos-uso/registrar-encuesta.servicio';
 import { PanelServicio } from '../aplicacion/casos-uso/panel.servicio';
 import { AlertaServicio } from '../aplicacion/casos-uso/alerta.servicio';
 import { GestionarIncidenciasAdministrativasCasoUso } from '../aplicacion/puertos/entrada/gestionar-incidencias-administrativas.caso-uso';
 import { ObtenerPerfilActualCasoUso } from '../aplicacion/puertos/entrada/obtener-perfil-actual.caso-uso';
 import { IniciarSesionCasoUso } from '../aplicacion/puertos/entrada/iniciar-sesion.caso-uso';
-import { RegistrarEstudianteCasoUso } from '../aplicacion/puertos/entrada/registrar-estudiante.caso-uso';
 import { RegistrarEncuestaCasoUso } from '../aplicacion/puertos/entrada/registrar-encuesta.caso-uso';
 import { GestionarAlertasCasoUso } from '../aplicacion/puertos/entrada/gestionar-alertas.caso-uso';
 import { ObtenerPanelCasoUso } from '../aplicacion/puertos/entrada/obtener-panel.caso-uso';
 import { RepositorioAvanceProcesoAdministrativoPuerto } from '../aplicacion/puertos/salida/repositorio-avance-proceso-administrativo.puerto';
 import { CifradorClavePuerto } from '../aplicacion/puertos/salida/cifrador-clave.puerto';
+import { EvaluadorRiesgoIaPuerto } from '../aplicacion/puertos/salida/evaluador-riesgo-ia.puerto';
 import { EmisorTokenPuerto } from '../aplicacion/puertos/salida/emisor-token.puerto';
 import { RepositorioEstudiantePuerto } from '../aplicacion/puertos/salida/repositorio-estudiante.puerto';
 import { RepositorioEncuestaPuerto } from '../aplicacion/puertos/salida/repositorio-encuesta.puerto';
@@ -32,7 +31,6 @@ import { CalculadorRiesgoServicio } from '../dominio/servicios/calculador-riesgo
 import { AutorizadorUsuarioServicio } from '../dominio/servicios/autorizador-usuario.servicio';
 import { AlertaControlador } from '../adaptadores/entrada/http/controladores/alerta.controlador';
 import { EncuestaControlador } from '../adaptadores/entrada/http/controladores/encuesta.controlador';
-import { EstudianteControlador } from '../adaptadores/entrada/http/controladores/estudiante.controlador';
 import { PanelControlador } from '../adaptadores/entrada/http/controladores/panel.controlador';
 import { AlertaOrmEntidad } from '../adaptadores/salida/persistencia/typeorm/entidades/alerta.orm-entidad';
 import { AvanceProcesoAdministrativoOrmEntidad } from '../adaptadores/salida/persistencia/typeorm/entidades/avance-proceso-administrativo.orm-entidad';
@@ -49,6 +47,7 @@ import { RepositorioProcesoAdministrativoTypeorm } from '../adaptadores/salida/p
 import { RepositorioSeguimientoAlertaTypeorm } from '../adaptadores/salida/persistencia/typeorm/repositorios/repositorio-seguimiento-alerta.typeorm';
 import { RepositorioUsuarioTypeorm } from '../adaptadores/salida/persistencia/typeorm/repositorios/repositorio-usuario.typeorm';
 import { BcryptCifradorClaveAdaptador } from '../adaptadores/salida/seguridad/bcrypt-cifrador-clave.adaptador';
+import { ClienteServicioIaAdaptador } from '../adaptadores/salida/ia/cliente-servicio-ia.adaptador';
 import { JwtEmisorTokenAdaptador } from '../adaptadores/salida/seguridad/jwt-emisor-token.adaptador';
 import { JwtEstrategia } from '../adaptadores/entrada/http/estrategias/jwt.estrategia';
 import { RolesGuard } from '../adaptadores/entrada/http/guardias/roles.guard';
@@ -81,7 +80,6 @@ import { RolesGuard } from '../adaptadores/entrada/http/guardias/roles.guard';
   controllers: [
     AutenticacionControlador,
     IncidenciasAdministrativasControlador,
-    EstudianteControlador,
     EncuestaControlador,
     AlertaControlador,
     PanelControlador,
@@ -92,7 +90,6 @@ import { RolesGuard } from '../adaptadores/entrada/http/guardias/roles.guard';
     IniciarSesionServicio,
     IncidenciasAdministrativasServicio,
     ObtenerPerfilActualServicio,
-    RegistrarEstudianteServicio,
     RegistrarEncuestaServicio,
     PanelServicio,
     AlertaServicio,
@@ -109,10 +106,6 @@ import { RolesGuard } from '../adaptadores/entrada/http/guardias/roles.guard';
     {
       provide: ObtenerPerfilActualCasoUso,
       useExisting: ObtenerPerfilActualServicio,
-    },
-    {
-      provide: RegistrarEstudianteCasoUso,
-      useExisting: RegistrarEstudianteServicio,
     },
     {
       provide: RegistrarEncuestaCasoUso,
@@ -153,6 +146,10 @@ import { RolesGuard } from '../adaptadores/entrada/http/guardias/roles.guard';
     {
       provide: RepositorioAvanceProcesoAdministrativoPuerto,
       useClass: RepositorioAvanceProcesoAdministrativoTypeorm,
+    },
+    {
+      provide: EvaluadorRiesgoIaPuerto,
+      useClass: ClienteServicioIaAdaptador,
     },
     {
       provide: CifradorClavePuerto,

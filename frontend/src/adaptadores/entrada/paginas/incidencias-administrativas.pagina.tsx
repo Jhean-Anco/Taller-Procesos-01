@@ -88,11 +88,28 @@ export function IncidenciasAdministrativasPagina({
     setEstadoAvance('en_proceso');
   };
 
+  const usarSintesisIa = () => {
+    if (!historiaSeleccionada) return;
+    const ultimaIndicacion = historiaSeleccionada.seguimientos[0];
+    const prioridad = historiaSeleccionada.encuesta.prioridadAtencionIa ?? 'seguimiento';
+    setAccionInstitucional(
+      ultimaIndicacion?.accionGlobal || `Accion institucional con prioridad ${prioridad}`,
+    );
+    setDescripcionInicial(
+      [
+        historiaSeleccionada.encuesta.accionRecomendadaIa,
+        ultimaIndicacion?.descripcion,
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+    );
+  };
+
   return (
     <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
       <div className="space-y-6">
         <form onSubmit={aplicarFiltros} className="rounded-3xl bg-white p-6 shadow-panel">
-          <h1 className="text-2xl font-black text-slate-800">Incidencias anonimas</h1>
+          <h1 className="text-2xl font-black text-slate-800">Incidencias derivadas a alta directiva</h1>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             <select
               value={estado}
@@ -139,6 +156,9 @@ export function IncidenciasAdministrativasPagina({
                       Riesgo {incidencia.puntajeRiesgo}
                     </p>
                     <p className="mt-2 text-sm text-slate-500">Estado: {incidencia.estado}</p>
+                    <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
+                      {incidencia.mensajeEtico}
+                    </p>
                   </div>
                   <button
                     onClick={() => void alSeleccionar(incidencia.id)}
@@ -157,7 +177,7 @@ export function IncidenciasAdministrativasPagina({
       </div>
 
       <div className="rounded-3xl bg-white p-6 shadow-panel">
-        <h2 className="text-2xl font-black text-slate-800">Proceso institucional</h2>
+        <h2 className="text-2xl font-black text-slate-800">Proceso de alta directiva</h2>
         {!historiaSeleccionada && (
           <p className="mt-6 text-sm text-slate-500">
             Selecciona una incidencia para revisar las acciones sugeridas por psicologia y registrar su ejecucion.
@@ -175,6 +195,39 @@ export function IncidenciasAdministrativasPagina({
               <p className="mt-3 text-sm text-slate-600">
                 Estado clinico: {historiaSeleccionada.alerta.estado}
               </p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {historiaSeleccionada.alerta.mensajeEtico}
+              </p>
+              <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                <p>IA: {historiaSeleccionada.encuesta.evaluacionIaDisponible ? 'disponible' : 'fallback local'}</p>
+                <p>Nivel IA: {historiaSeleccionada.encuesta.nivelRiesgoIa ?? 'sin dato'}</p>
+                <p>Prioridad: {historiaSeleccionada.encuesta.prioridadAtencionIa ?? 'sin dato'}</p>
+                <p>Confianza global: {historiaSeleccionada.encuesta.confianzaGlobalIa ? `${Math.round(historiaSeleccionada.encuesta.confianzaGlobalIa * 100)}%` : 'sin dato'}</p>
+                <p>Arbol: {historiaSeleccionada.encuesta.prediccionArbol ?? 'sin dato'}</p>
+                <p>Sentimiento: {historiaSeleccionada.encuesta.sentimientoTextoIa ?? 'sin dato'}</p>
+              </div>
+              {historiaSeleccionada.encuesta.analisisPsicologicoIa && (
+                <p className="mt-4 rounded-2xl bg-white p-3 text-sm leading-6 text-slate-700">
+                  {historiaSeleccionada.encuesta.analisisPsicologicoIa}
+                </p>
+              )}
+              {historiaSeleccionada.encuesta.accionRecomendadaIa && (
+                <p className="mt-4 rounded-2xl bg-white p-3 text-sm font-semibold text-slate-700">
+                  {historiaSeleccionada.encuesta.accionRecomendadaIa}
+                </p>
+              )}
+              {(historiaSeleccionada.encuesta.factoresDetectadosIa?.length ?? 0) > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {historiaSeleccionada.encuesta.factoresDetectadosIa?.map((factor) => (
+                    <span
+                      key={factor}
+                      className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                    >
+                      {factor}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -196,7 +249,20 @@ export function IncidenciasAdministrativasPagina({
             </div>
 
             <form onSubmit={registrarProceso} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <h3 className="text-lg font-bold text-slate-800">Iniciar accion administrativa</h3>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="text-lg font-bold text-slate-800">Iniciar accion administrativa</h3>
+                <button
+                  type="button"
+                  onClick={usarSintesisIa}
+                  disabled={
+                    !historiaSeleccionada.encuesta.accionRecomendadaIa &&
+                    historiaSeleccionada.seguimientos.length === 0
+                  }
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Usar sintesis IA
+                </button>
+              </div>
               <input
                 value={accionInstitucional}
                 onChange={(evento) => setAccionInstitucional(evento.target.value)}

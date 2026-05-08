@@ -1,10 +1,16 @@
 {
   "scripts": {
     "instalar:todo": "npm install --prefix backend && npm install --prefix frontend",
-    "dev": "npm-run-all --parallel dev:backend dev:frontend",
+    "instalar:ia": "C:\\PROGRA~1\\PowerShell\\7\\pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/instalar-ia.ps1",
+    "dev": "C:\\PROGRA~1\\PowerShell\\7\\pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "dev:stop": "C:\\PROGRA~1\\PowerShell\\7\\pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/detener-dev.ps1",
+    "dev:ia": "C:\\PROGRA~1\\PowerShell\\7\\pwsh.exe -NoProfile -ExecutionPolicy Bypass -File scripts/servicio-ia.ps1",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix backend run build && npm --prefix frontend run build",
     "test": "npm --prefix backend run test"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
   }
 }

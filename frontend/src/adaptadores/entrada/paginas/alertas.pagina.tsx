@@ -55,6 +55,21 @@ export function AlertasPagina({
     setDescripcion('');
   };
 
+  const usarRevisionIa = () => {
+    if (!historiaSeleccionada) return;
+    const prioridad =
+      historiaSeleccionada.encuesta.prioridadAtencionIa ?? 'seguimiento';
+    setAccionGlobal(`Revision psicologica con prioridad ${prioridad}`);
+    setDescripcion(
+      [
+        historiaSeleccionada.encuesta.analisisPsicologicoIa,
+        historiaSeleccionada.encuesta.accionRecomendadaIa,
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+    );
+  };
+
   return (
     <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
       <div className="space-y-6">
@@ -124,6 +139,9 @@ export function AlertasPagina({
                     <p className="mt-2 text-sm text-slate-500">
                       Estado actual: {alerta.estado}
                     </p>
+                    <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
+                      {alerta.mensajeEtico}
+                    </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
@@ -180,23 +198,86 @@ export function AlertasPagina({
               <p className="mt-3 text-sm text-slate-600">
                 Estado: {historiaSeleccionada.alerta.estado}
               </p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {historiaSeleccionada.alerta.mensajeEtico}
+              </p>
               <p className="mt-2 text-sm text-slate-600">
                 Actualizado: {new Date(historiaSeleccionada.alerta.ultimaActualizacion).toLocaleString('es-PE')}
               </p>
             </div>
 
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <h3 className="text-lg font-bold text-slate-800">Relato emocional</h3>
+              <h3 className="text-lg font-bold text-slate-800">Datos crudos anonimos</h3>
               <p className="mt-3 leading-7 text-slate-700">
                 {historiaSeleccionada.encuesta.textoEmocional}
               </p>
               <p className="mt-4 text-sm text-slate-500">
-                Animo {historiaSeleccionada.encuesta.nivelAnimo} / Seguridad {historiaSeleccionada.encuesta.nivelSeguridad}
+                Animo {historiaSeleccionada.encuesta.nivelAnimo} / Seguridad {historiaSeleccionada.encuesta.nivelSeguridad} / Puntaje {historiaSeleccionada.encuesta.puntajeRiesgo}
               </p>
+              <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                <p>IA: {historiaSeleccionada.encuesta.evaluacionIaDisponible ? 'disponible' : 'fallback local'}</p>
+                <p>Nivel IA: {historiaSeleccionada.encuesta.nivelRiesgoIa ?? 'sin dato'}</p>
+                <p>Prioridad: {historiaSeleccionada.encuesta.prioridadAtencionIa ?? 'sin dato'}</p>
+                <p>Confianza global: {historiaSeleccionada.encuesta.confianzaGlobalIa ? `${Math.round(historiaSeleccionada.encuesta.confianzaGlobalIa * 100)}%` : 'sin dato'}</p>
+                <p>Arbol: {historiaSeleccionada.encuesta.prediccionArbol ?? 'sin dato'}</p>
+                <p>Sentimiento: {historiaSeleccionada.encuesta.sentimientoTextoIa ?? 'sin dato'}</p>
+              </div>
+              <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                <p>Grado: {historiaSeleccionada.encuesta.grado === 1 ? 'Secundaria' : 'Primaria'}</p>
+                <p>Zona: {historiaSeleccionada.encuesta.zonaJunin === 1 ? 'Urbana' : 'Rural'}</p>
+                <p>Solo en recreo: {historiaSeleccionada.encuesta.recreoSolo === 1 ? 'si' : 'no'}</p>
+                <p>Miedo de participar: {historiaSeleccionada.encuesta.miedoParticipar === 1 ? 'si' : 'no'}</p>
+                <p>Redes sociales: {historiaSeleccionada.encuesta.redesSociales === 1 ? 'si' : 'no'}</p>
+                <p>Apoyo familiar: {historiaSeleccionada.encuesta.apoyoFamiliar === 1 ? 'si' : 'no'}</p>
+                <p>Rendimiento afectado: {historiaSeleccionada.encuesta.rendimiento === 1 ? 'si' : 'no'}</p>
+                <p>Entorno violento: {historiaSeleccionada.encuesta.entornoViolento === 1 ? 'si' : 'no'}</p>
+              </div>
+              {(historiaSeleccionada.encuesta.factoresDetectadosIa?.length ?? 0) > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {historiaSeleccionada.encuesta.factoresDetectadosIa?.map((factor) => (
+                    <span
+                      key={factor}
+                      className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                    >
+                      {factor}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {(historiaSeleccionada.encuesta.analisisPsicologicoIa ||
+              historiaSeleccionada.encuesta.accionRecomendadaIa) && (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <h3 className="text-lg font-bold text-slate-800">Revision inicial IA</h3>
+                {historiaSeleccionada.encuesta.analisisPsicologicoIa && (
+                  <p className="mt-3 leading-7 text-slate-700">
+                    {historiaSeleccionada.encuesta.analisisPsicologicoIa}
+                  </p>
+                )}
+                {historiaSeleccionada.encuesta.accionRecomendadaIa && (
+                  <p className="mt-4 rounded-2xl bg-white p-3 text-sm font-semibold text-slate-700">
+                    {historiaSeleccionada.encuesta.accionRecomendadaIa}
+                  </p>
+                )}
+              </div>
+            )}
+
             <form onSubmit={enviarSeguimiento} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <h3 className="text-lg font-bold text-slate-800">Accion y seguimiento</h3>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="text-lg font-bold text-slate-800">Accion y seguimiento</h3>
+                <button
+                  type="button"
+                  onClick={usarRevisionIa}
+                  disabled={
+                    !historiaSeleccionada.encuesta.analisisPsicologicoIa &&
+                    !historiaSeleccionada.encuesta.accionRecomendadaIa
+                  }
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Usar revision IA
+                </button>
+              </div>
               <input
                 value={accionGlobal}
                 onChange={(evento) => setAccionGlobal(evento.target.value)}

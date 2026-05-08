@@ -20,8 +20,12 @@ export class PanelServicio implements ObtenerPanelCasoUso {
   async ejecutar(): Promise<ResumenPanelDto> {
     const [
       totalIncidencias,
+      incidenciasEscaladas,
+      incidenciasCriticas,
       incidenciasPendientes,
       incidenciasEnEvaluacion,
+      totalEncuestas,
+      reportesEvaluadosConIa,
       procesosAdministrativos,
       procesosActivos,
       procesosCompletados,
@@ -29,8 +33,12 @@ export class PanelServicio implements ObtenerPanelCasoUso {
       riesgoPromedio,
     ] = await Promise.all([
       this.repositorioAlerta.contar(),
+      this.repositorioAlerta.contarEscaladasParaAdministracion(),
+      this.repositorioAlerta.contarPorRiesgoMinimo(85),
       this.repositorioAlerta.contarPorEstado('pendiente'),
       this.repositorioAlerta.contarPorEstado('evaluacion'),
+      this.repositorioEncuesta.contar(),
+      this.repositorioEncuesta.contarConEvaluacionIa(),
       this.repositorioProcesoAdministrativo.contar(),
       this.repositorioProcesoAdministrativo.contarPorEstado('en_proceso'),
       this.repositorioProcesoAdministrativo.contarPorEstado('completado'),
@@ -42,11 +50,19 @@ export class PanelServicio implements ObtenerPanelCasoUso {
       procesosAdministrativos === 0
         ? 0
         : Number(((procesosCompletados / procesosAdministrativos) * 100).toFixed(1));
+    const coberturaIa =
+      totalEncuestas === 0
+        ? 0
+        : Number(((reportesEvaluadosConIa / totalEncuestas) * 100).toFixed(1));
 
     return {
       totalIncidencias,
+      incidenciasEscaladas,
+      incidenciasCriticas,
       incidenciasPendientes,
       incidenciasEnEvaluacion,
+      reportesEvaluadosConIa,
+      coberturaIa,
       procesosAdministrativos,
       procesosActivos,
       procesosCompletados,
@@ -54,7 +70,7 @@ export class PanelServicio implements ObtenerPanelCasoUso {
       cumplimientoProcesos,
       riesgoPromedio,
       mensajeInstitucional:
-        'El area administrativa convierte las orientaciones psicologicas en acciones institucionales, registra avances y documenta resultados por incidencia.',
+        'La alta directiva recibe solo incidencias anonimas derivadas por psicologia, registra acciones institucionales, avances y resultados por caso.',
     };
   }
 }

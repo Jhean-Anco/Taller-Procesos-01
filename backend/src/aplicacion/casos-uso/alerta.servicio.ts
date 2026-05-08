@@ -78,7 +78,7 @@ export class AlertaServicio implements GestionarAlertasCasoUso {
         alerta.estudianteId,
         usuarioActual.usuarioId,
         alerta.puntajeRiesgo,
-        alerta.estado,
+        alerta.estado === 'pendiente' ? 'evaluacion' : alerta.estado,
         alerta.mensajeEtico,
         alerta.fechaCreacion,
         new Date(),

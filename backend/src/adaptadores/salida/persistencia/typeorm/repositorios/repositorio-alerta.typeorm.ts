@@ -2,7 +2,7 @@ import { FiltroAlertasDto } from '../../../../../aplicacion/dto/filtro-alertas.d
 import { HistoriaAlertaDto } from '../../../../../aplicacion/dto/historia-alerta.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { RepositorioAlertaPuerto } from '../../../../../aplicacion/puertos/salida/repositorio-alerta.puerto';
 import { AlertaEntidad, EstadoAlerta } from '../../../../../dominio/entidades/alerta.entidad';
 import { AlertaOrmEntidad } from '../entidades/alerta.orm-entidad';
@@ -23,32 +23,24 @@ export class RepositorioAlertaTypeorm implements RepositorioAlertaPuerto {
   }
 
   async listar(filtros?: FiltroAlertasDto): Promise<AlertaEntidad[]> {
-    const consulta = this.repositorio.createQueryBuilder('alerta');
+    const consulta = this.aplicarFiltros(
+      this.repositorio.createQueryBuilder('alerta'),
+      filtros,
+    );
+    const alertas = await consulta.orderBy('alerta.fechaCreacion', 'DESC').getMany();
+    return alertas.map(AlertaMapeador.aDominio);
+  }
 
-    if (filtros?.estado) {
-      consulta.andWhere('alerta.estado = :estado', { estado: filtros.estado });
-    }
-    if (typeof filtros?.riesgoMinimo === 'number') {
-      consulta.andWhere('alerta.puntajeRiesgo >= :riesgoMinimo', {
-        riesgoMinimo: filtros.riesgoMinimo,
-      });
-    }
-    if (typeof filtros?.riesgoMaximo === 'number') {
-      consulta.andWhere('alerta.puntajeRiesgo <= :riesgoMaximo', {
-        riesgoMaximo: filtros.riesgoMaximo,
-      });
-    }
-    if (filtros?.fechaDesde) {
-      consulta.andWhere('alerta.fechaCreacion >= :fechaDesde', {
-        fechaDesde: filtros.fechaDesde,
-      });
-    }
-    if (filtros?.fechaHasta) {
-      consulta.andWhere('alerta.fechaCreacion <= :fechaHasta', {
-        fechaHasta: filtros.fechaHasta,
-      });
-    }
-
+  async listarEscaladasParaAdministracion(
+    filtros?: FiltroAlertasDto,
+  ): Promise<AlertaEntidad[]> {
+    const consulta = this.aplicarFiltros(
+      this.repositorio
+        .createQueryBuilder('alerta')
+        .innerJoin('alerta.seguimientos', 'seguimiento')
+        .distinct(true),
+      filtros,
+    );
     const alertas = await consulta.orderBy('alerta.fechaCreacion', 'DESC').getMany();
     return alertas.map(AlertaMapeador.aDominio);
   }
@@ -79,6 +71,7 @@ export class RepositorioAlertaTypeorm implements RepositorioAlertaPuerto {
         encuestaId: alerta.encuestaId,
         puntajeRiesgo: alerta.puntajeRiesgo,
         estado: alerta.estado as HistoriaAlertaDto['alerta']['estado'],
+        mensajeEtico: alerta.mensajeEtico,
         psicologoAsignadoId: alerta.psicologoAsignadoId,
         fechaCreacion: alerta.fechaCreacion,
         ultimaActualizacion: alerta.ultimaActualizacion,
@@ -87,6 +80,28 @@ export class RepositorioAlertaTypeorm implements RepositorioAlertaPuerto {
         textoEmocional: alerta.encuesta.textoEmocional,
         nivelAnimo: alerta.encuesta.nivelAnimo,
         nivelSeguridad: alerta.encuesta.nivelSeguridad,
+        puntajeRiesgo: alerta.encuesta.puntajeRiesgo,
+        grado: alerta.encuesta.grado,
+        zonaJunin: alerta.encuesta.zonaJunin,
+        recreoSolo: alerta.encuesta.recreoSolo,
+        animoManana: alerta.encuesta.animoManana,
+        miedoParticipar: alerta.encuesta.miedoParticipar,
+        redesSociales: alerta.encuesta.redesSociales,
+        apoyoFamiliar: alerta.encuesta.apoyoFamiliar,
+        rendimiento: alerta.encuesta.rendimiento,
+        habilidadesSociales: alerta.encuesta.habilidadesSociales,
+        entornoViolento: alerta.encuesta.entornoViolento,
+        evaluacionIaDisponible: alerta.encuesta.evaluacionIaDisponible,
+        nivelRiesgoIa: alerta.encuesta.nivelRiesgoIa,
+        prioridadAtencionIa: alerta.encuesta.prioridadAtencionIa,
+        analisisPsicologicoIa: alerta.encuesta.analisisPsicologicoIa,
+        accionRecomendadaIa: alerta.encuesta.accionRecomendadaIa,
+        factoresDetectadosIa: alerta.encuesta.factoresDetectadosIa,
+        factoresProtectoresIa: alerta.encuesta.factoresProtectoresIa,
+        prediccionArbol: alerta.encuesta.prediccionArbol,
+        sentimientoTextoIa: alerta.encuesta.sentimientoTextoIa,
+        confianzaTextoIa: alerta.encuesta.confianzaTextoIa,
+        confianzaGlobalIa: alerta.encuesta.confianzaGlobalIa,
         fechaCreacion: alerta.encuesta.fechaCreacion,
       },
       seguimientos: alerta.seguimientos
@@ -140,5 +155,51 @@ export class RepositorioAlertaTypeorm implements RepositorioAlertaPuerto {
 
   contarPorEstado(estado: EstadoAlerta): Promise<number> {
     return this.repositorio.countBy({ estado });
+  }
+
+  contarPorRiesgoMinimo(riesgoMinimo: number): Promise<number> {
+    return this.repositorio
+      .createQueryBuilder('alerta')
+      .where('alerta.puntajeRiesgo >= :riesgoMinimo', { riesgoMinimo })
+      .getCount();
+  }
+
+  contarEscaladasParaAdministracion(): Promise<number> {
+    return this.repositorio
+      .createQueryBuilder('alerta')
+      .innerJoin('alerta.seguimientos', 'seguimiento')
+      .distinct(true)
+      .getCount();
+  }
+
+  private aplicarFiltros(
+    consulta: SelectQueryBuilder<AlertaOrmEntidad>,
+    filtros?: FiltroAlertasDto,
+  ): SelectQueryBuilder<AlertaOrmEntidad> {
+    if (filtros?.estado) {
+      consulta.andWhere('alerta.estado = :estado', { estado: filtros.estado });
+    }
+    if (typeof filtros?.riesgoMinimo === 'number') {
+      consulta.andWhere('alerta.puntajeRiesgo >= :riesgoMinimo', {
+        riesgoMinimo: filtros.riesgoMinimo,
+      });
+    }
+    if (typeof filtros?.riesgoMaximo === 'number') {
+      consulta.andWhere('alerta.puntajeRiesgo <= :riesgoMaximo', {
+        riesgoMaximo: filtros.riesgoMaximo,
+      });
+    }
+    if (filtros?.fechaDesde) {
+      consulta.andWhere('alerta.fechaCreacion >= :fechaDesde', {
+        fechaDesde: filtros.fechaDesde,
+      });
+    }
+    if (filtros?.fechaHasta) {
+      consulta.andWhere('alerta.fechaCreacion <= :fechaHasta', {
+        fechaHasta: filtros.fechaHasta,
+      });
+    }
+
+    return consulta;
   }
 }

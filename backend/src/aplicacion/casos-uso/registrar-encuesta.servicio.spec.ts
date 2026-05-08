@@ -6,6 +6,11 @@ import { RegistrarEncuestaServicio } from './registrar-encuesta.servicio';
 import { RepositorioAlertaPuerto } from '../puertos/salida/repositorio-alerta.puerto';
 import { RepositorioEncuestaPuerto } from '../puertos/salida/repositorio-encuesta.puerto';
 import { RepositorioEstudiantePuerto } from '../puertos/salida/repositorio-estudiante.puerto';
+import {
+  EvaluadorRiesgoIaPuerto,
+  ResultadoEvaluacionRiesgoIa,
+  SolicitudEvaluacionRiesgoIa,
+} from '../puertos/salida/evaluador-riesgo-ia.puerto';
 
 class RepositorioEstudianteMemoria implements RepositorioEstudiantePuerto {
   async guardar(estudiante: EstudianteEntidad): Promise<EstudianteEntidad> {
@@ -42,12 +47,37 @@ class RepositorioEncuestaMemoria implements RepositorioEncuestaPuerto {
       encuesta.nivelAnimo,
       encuesta.nivelSeguridad,
       encuesta.fechaCreacion,
+      encuesta.puntajeRiesgo,
+      encuesta.grado,
+      encuesta.zonaJunin,
+      encuesta.recreoSolo,
+      encuesta.animoManana,
+      encuesta.miedoParticipar,
+      encuesta.redesSociales,
+      encuesta.apoyoFamiliar,
+      encuesta.rendimiento,
+      encuesta.habilidadesSociales,
+      encuesta.entornoViolento,
+      encuesta.evaluacionIaDisponible,
+      encuesta.nivelRiesgoIa,
+      encuesta.prioridadAtencionIa,
+      encuesta.analisisPsicologicoIa,
+      encuesta.accionRecomendadaIa,
+      encuesta.factoresDetectadosIa,
+      encuesta.factoresProtectoresIa,
+      encuesta.prediccionArbol,
+      encuesta.sentimientoTextoIa,
+      encuesta.confianzaTextoIa,
+      encuesta.confianzaGlobalIa,
     );
   }
   async listar(): Promise<EncuestaEmocionalEntidad[]> {
     return [];
   }
   async contar(): Promise<number> {
+    return 0;
+  }
+  async contarConEvaluacionIa(): Promise<number> {
     return 0;
   }
   async promedioRiesgo(): Promise<number> {
@@ -75,6 +105,9 @@ class RepositorioAlertaMemoria implements RepositorioAlertaPuerto {
   async listar(): Promise<AlertaEntidad[]> {
     return [];
   }
+  async listarEscaladasParaAdministracion(): Promise<AlertaEntidad[]> {
+    return [];
+  }
   async obtenerPorId(): Promise<AlertaEntidad | null> {
     return null;
   }
@@ -87,9 +120,58 @@ class RepositorioAlertaMemoria implements RepositorioAlertaPuerto {
   async contarPorEstado(): Promise<number> {
     return 0;
   }
+  async contarPorRiesgoMinimo(): Promise<number> {
+    return 0;
+  }
+  async contarEscaladasParaAdministracion(): Promise<number> {
+    return 0;
+  }
+}
+
+class EvaluadorRiesgoIaNoDisponible implements EvaluadorRiesgoIaPuerto {
+  async evaluar(
+    _solicitud: SolicitudEvaluacionRiesgoIa,
+  ): Promise<ResultadoEvaluacionRiesgoIa> {
+    return {
+      disponible: false,
+      puntajeRiesgo: null,
+      nivelRiesgo: null,
+      prioridadAtencion: null,
+      analisisPsicologico: null,
+      accionRecomendada: null,
+      factoresDetectados: [],
+      factoresProtectores: [],
+      prediccionArbol: null,
+      sentimientoTexto: null,
+      confianzaTexto: null,
+      confianzaGlobal: null,
+      error: 'servicio no iniciado en prueba',
+    };
+  }
 }
 
 describe('RegistrarEncuestaServicio', () => {
+  it('crea un registro visible para psicologia aunque el riesgo sea bajo', async () => {
+    const repositorioAlerta = new RepositorioAlertaMemoria();
+    const servicio = new RegistrarEncuestaServicio(
+      new RepositorioEncuestaMemoria(),
+      new RepositorioEstudianteMemoria(),
+      repositorioAlerta,
+      new CalculadorRiesgoServicio(),
+      new EvaluadorRiesgoIaNoDisponible(),
+    );
+
+    await servicio.registrar({
+      textoEmocional: 'Hoy me siento tranquilo y acompanado en clases',
+      nivelAnimo: 5,
+      nivelSeguridad: 5,
+    });
+
+    expect(repositorioAlerta.alertaGuardada).not.toBeNull();
+    expect(repositorioAlerta.alertaGuardada?.estado).toBe('pendiente');
+    expect(repositorioAlerta.alertaGuardada?.puntajeRiesgo).toBe(0);
+  });
+
   it('generar alerta cuando el riesgo es mayor o igual a 40', async () => {
     const repositorioAlerta = new RepositorioAlertaMemoria();
     const servicio = new RegistrarEncuestaServicio(
@@ -97,6 +179,7 @@ describe('RegistrarEncuestaServicio', () => {
       new RepositorioEstudianteMemoria(),
       repositorioAlerta,
       new CalculadorRiesgoServicio(),
+      new EvaluadorRiesgoIaNoDisponible(),
     );
 
     await servicio.registrar({

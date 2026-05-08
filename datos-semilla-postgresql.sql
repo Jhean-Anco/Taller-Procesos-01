@@ -26,10 +26,10 @@ ON CONFLICT (nombre_usuario) DO NOTHING;
 
 INSERT INTO estudiantes (id, usuario_id, codigo_anonimo, fecha_creacion)
 VALUES
-  ('11111111-1111-1111-1111-111111111111', NULL, 'EST-001', NOW() - INTERVAL '5 days'),
-  ('22222222-2222-2222-2222-222222222222', NULL, 'EST-002', NOW() - INTERVAL '4 days'),
-  ('33333333-3333-3333-3333-333333333333', NULL, 'EST-003', NOW() - INTERVAL '3 days'),
-  ('44444444-4444-4444-4444-444444444444', NULL, 'EST-004', NOW() - INTERVAL '2 days')
+  ('11111111-1111-1111-1111-111111111111', NULL, 'REP-SEM-001', NOW() - INTERVAL '5 days'),
+  ('22222222-2222-2222-2222-222222222222', NULL, 'REP-SEM-002', NOW() - INTERVAL '4 days'),
+  ('33333333-3333-3333-3333-333333333333', NULL, 'REP-SEM-003', NOW() - INTERVAL '3 days'),
+  ('44444444-4444-4444-4444-444444444444', NULL, 'REP-SEM-004', NOW() - INTERVAL '2 days')
 ON CONFLICT (codigo_anonimo) DO NOTHING;
 
 INSERT INTO encuestas_emocionales (
@@ -39,6 +39,27 @@ INSERT INTO encuestas_emocionales (
   nivel_animo,
   nivel_seguridad,
   puntaje_riesgo,
+  grado,
+  zona_junin,
+  recreo_solo,
+  animo_manana,
+  miedo_participar,
+  redes_sociales,
+  apoyo_familiar,
+  rendimiento,
+  habilidades_sociales,
+  entorno_violento,
+  evaluacion_ia_disponible,
+  nivel_riesgo_ia,
+  prioridad_atencion_ia,
+  analisis_psicologico_ia,
+  accion_recomendada_ia,
+  factores_detectados_ia,
+  factores_protectores_ia,
+  prediccion_arbol,
+  sentimiento_texto_ia,
+  confianza_texto_ia,
+  confianza_global_ia,
   fecha_creacion
 )
 VALUES
@@ -48,7 +69,28 @@ VALUES
     'Hoy me siento tranquilo y acompanado en clases',
     5,
     5,
+    20,
+    1,
+    1,
     0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    TRUE,
+    'BAJO RIESGO',
+    'monitoreo',
+    'Estable. Mantener monitoreo.',
+    'Mantener monitoreo preventivo sin generar alarma institucional.',
+    '[]',
+    '["apoyo familiar disponible","habilidades sociales adecuadas"]',
+    0,
+    'POS',
+    0.910000,
+    0.570000,
     NOW() - INTERVAL '4 days'
   ),
   (
@@ -57,7 +99,28 @@ VALUES
     'A veces me siento triste y algo inseguro cuando salgo al recreo',
     3,
     3,
-    40,
+    75,
+    1,
+    1,
+    1,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    0,
+    TRUE,
+    'ALTO RIESGO',
+    'alta',
+    'Alerta psicologica. Se detecto patron de riesgo numerico o texto agresivo/depresivo.',
+    'Asignar revision psicologica prioritaria y preparar seguimiento institucional.',
+    '["aislamiento durante recreo","miedo de participar","rendimiento afectado"]',
+    '["apoyo familiar disponible"]',
+    0,
+    'NEG',
+    0.940000,
+    0.820000,
     NOW() - INTERVAL '3 days'
   ),
   (
@@ -66,7 +129,28 @@ VALUES
     'Tengo miedo porque recibo insultos y me siento solo',
     2,
     2,
-    85,
+    95,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    TRUE,
+    'RIESGO CRITICO',
+    'inmediata',
+    'Alerta psicologica. Se detecto patron de riesgo numerico y texto agresivo/depresivo.',
+    'Derivar hoy a psicologia y activar revision institucional preventiva.',
+    '["patron conductual compatible con alerta","relato con carga emocional negativa","aislamiento durante recreo","animo bajo al iniciar el dia","miedo de participar","bajo apoyo familiar percibido","rendimiento afectado","habilidades sociales limitadas","exposicion a entorno violento"]',
+    '[]',
+    1,
+    'NEG',
+    0.970000,
+    0.980000,
     NOW() - INTERVAL '2 days'
   ),
   (
@@ -76,9 +160,57 @@ VALUES
     2,
     1,
     100,
+    1,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    1,
+    0,
+    1,
+    TRUE,
+    'RIESGO CRITICO',
+    'inmediata',
+    'Alerta psicologica. Se detecto patron de riesgo numerico y texto agresivo/depresivo.',
+    'Derivar hoy a psicologia y activar revision institucional preventiva.',
+    '["patron conductual compatible con alerta","relato con carga emocional negativa","aislamiento durante recreo","animo bajo al iniciar el dia","miedo de participar","bajo apoyo familiar percibido","rendimiento afectado","habilidades sociales limitadas","exposicion a entorno violento"]',
+    '[]',
+    1,
+    'NEG',
+    0.980000,
+    0.990000,
     NOW() - INTERVAL '1 day'
   )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  estudiante_id = EXCLUDED.estudiante_id,
+  texto_emocional = EXCLUDED.texto_emocional,
+  nivel_animo = EXCLUDED.nivel_animo,
+  nivel_seguridad = EXCLUDED.nivel_seguridad,
+  puntaje_riesgo = EXCLUDED.puntaje_riesgo,
+  grado = EXCLUDED.grado,
+  zona_junin = EXCLUDED.zona_junin,
+  recreo_solo = EXCLUDED.recreo_solo,
+  animo_manana = EXCLUDED.animo_manana,
+  miedo_participar = EXCLUDED.miedo_participar,
+  redes_sociales = EXCLUDED.redes_sociales,
+  apoyo_familiar = EXCLUDED.apoyo_familiar,
+  rendimiento = EXCLUDED.rendimiento,
+  habilidades_sociales = EXCLUDED.habilidades_sociales,
+  entorno_violento = EXCLUDED.entorno_violento,
+  evaluacion_ia_disponible = EXCLUDED.evaluacion_ia_disponible,
+  nivel_riesgo_ia = EXCLUDED.nivel_riesgo_ia,
+  prioridad_atencion_ia = EXCLUDED.prioridad_atencion_ia,
+  analisis_psicologico_ia = EXCLUDED.analisis_psicologico_ia,
+  accion_recomendada_ia = EXCLUDED.accion_recomendada_ia,
+  factores_detectados_ia = EXCLUDED.factores_detectados_ia,
+  factores_protectores_ia = EXCLUDED.factores_protectores_ia,
+  prediccion_arbol = EXCLUDED.prediccion_arbol,
+  sentimiento_texto_ia = EXCLUDED.sentimiento_texto_ia,
+  confianza_texto_ia = EXCLUDED.confianza_texto_ia,
+  confianza_global_ia = EXCLUDED.confianza_global_ia,
+  fecha_creacion = EXCLUDED.fecha_creacion;
 
 INSERT INTO alertas (
   id,
@@ -97,9 +229,9 @@ VALUES
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
     '22222222-2222-2222-2222-222222222222',
     '90000000-0000-0000-0000-000000000001',
-    40,
-    'pendiente',
-    'Este sistema no emite diagnosticos. La alerta solo orienta una revision humana.',
+    75,
+    'evaluacion',
+    'Este sistema no emite diagnosticos. La alerta solo orienta una revision humana. IA ALTO RIESGO: Alerta psicologica. Se detecto patron de riesgo numerico o texto agresivo/depresivo. Detalle tecnico: arbol=0, sentimiento=NEG.',
     NOW() - INTERVAL '3 days',
     NOW() - INTERVAL '3 days'
   ),
@@ -108,9 +240,9 @@ VALUES
     'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
     '33333333-3333-3333-3333-333333333333',
     '90000000-0000-0000-0000-000000000001',
-    85,
+    95,
     'evaluacion',
-    'Este sistema no emite diagnosticos. La alerta solo orienta una revision humana.',
+    'Este sistema no emite diagnosticos. La alerta solo orienta una revision humana. IA ALTO RIESGO: Alerta psicologica. Se detecto patron de riesgo numerico y texto agresivo/depresivo. Detalle tecnico: arbol=1, sentimiento=NEG.',
     NOW() - INTERVAL '2 days',
     NOW() - INTERVAL '2 days'
   ),
@@ -121,11 +253,19 @@ VALUES
     '90000000-0000-0000-0000-000000000001',
     100,
     'cerrada',
-    'Este sistema no emite diagnosticos. La alerta solo orienta una revision humana.',
+    'Este sistema no emite diagnosticos. La alerta solo orienta una revision humana. IA ALTO RIESGO: Alerta psicologica. Se detecto patron de riesgo numerico y texto agresivo/depresivo. Detalle tecnico: arbol=1, sentimiento=NEG.',
     NOW() - INTERVAL '1 day',
     NOW() - INTERVAL '1 day'
   )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  encuesta_id = EXCLUDED.encuesta_id,
+  estudiante_id = EXCLUDED.estudiante_id,
+  psicologo_asignado_id = EXCLUDED.psicologo_asignado_id,
+  puntaje_riesgo = EXCLUDED.puntaje_riesgo,
+  estado = EXCLUDED.estado,
+  mensaje_etico = EXCLUDED.mensaje_etico,
+  fecha_creacion = EXCLUDED.fecha_creacion,
+  ultima_actualizacion = EXCLUDED.ultima_actualizacion;
 
 INSERT INTO seguimientos_alerta (
   id,
@@ -151,6 +291,14 @@ VALUES
     'Entrevistas de contencion',
     'Se plantea seguimiento profesional y monitoreo del entorno escolar.',
     NOW() - INTERVAL '1 day'
+  ),
+  (
+    'cccccccc-cccc-cccc-cccc-ccccccccccc3',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb3',
+    '90000000-0000-0000-0000-000000000001',
+    'Cierre con medidas preventivas',
+    'Se deja constancia de acciones institucionales ejecutadas y observacion posterior sin nuevos reportes.',
+    NOW() - INTERVAL '18 hours'
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -190,6 +338,18 @@ VALUES
     'pendiente',
     NOW() - INTERVAL '12 hours',
     NOW() - INTERVAL '12 hours'
+  ),
+  (
+    'dddddddd-dddd-dddd-dddd-ddddddddddd3',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb3',
+    '90000000-0000-0000-0000-000000000002',
+    'Activacion de protocolo de convivencia',
+    'Alta directiva documento medidas institucionales, coordinacion con tutoria y cierre preventivo del caso anonimo.',
+    'Alta directiva',
+    NOW() - INTERVAL '6 hours',
+    'completado',
+    NOW() - INTERVAL '16 hours',
+    NOW() - INTERVAL '4 hours'
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -220,5 +380,14 @@ VALUES
     'resultado',
     'en_proceso',
     NOW() - INTERVAL '6 hours'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee3',
+    'dddddddd-dddd-dddd-dddd-ddddddddddd3',
+    '90000000-0000-0000-0000-000000000002',
+    'Se cerro el proceso con registro de medidas preventivas y comunicacion interna a tutoria.',
+    'resultado',
+    'completado',
+    NOW() - INTERVAL '4 hours'
   )
 ON CONFLICT (id) DO NOTHING;

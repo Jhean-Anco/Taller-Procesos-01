@@ -5,7 +5,6 @@ import { RegistrarProcesoAdministrativoDto } from '../../dto/registrar-proceso-a
 import { RegistrarSeguimientoAlertaDto } from '../../dto/registrar-seguimiento-alerta.dto';
 import { ActualizarAlertaDto } from '../../dto/actualizar-alerta.dto';
 import { RegistrarEncuestaDto } from '../../dto/registrar-encuesta.dto';
-import { RegistrarEstudianteDto } from '../../dto/registrar-estudiante.dto';
 import { AlertaEntidad } from '../../../dominio/entidades/alerta.entidad';
 import { AvanceProcesoAdministrativoEntidad } from '../../../dominio/entidades/avance-proceso-administrativo.entidad';
 import { EncuestaEmocionalEntidad } from '../../../dominio/entidades/encuesta-emocional.entidad';
@@ -14,13 +13,10 @@ import { PanelEntidad } from '../../../dominio/entidades/panel.entidad';
 import { ProcesoAdministrativoEntidad } from '../../../dominio/entidades/proceso-administrativo.entidad';
 import { SesionEntidad } from '../../../dominio/entidades/sesion.entidad';
 import { SeguimientoAlertaEntidad } from '../../../dominio/entidades/seguimiento-alerta.entidad';
-import { EstudianteEntidad } from '../../../dominio/entidades/estudiante.entidad';
 
 export interface ClienteApiPuerto {
   iniciarSesion(dto: IniciarSesionDto): Promise<SesionEntidad>;
   obtenerPerfilActual(): Promise<SesionEntidad['usuario']>;
-  registrarEstudiante(dto: RegistrarEstudianteDto): Promise<EstudianteEntidad>;
-  listarEstudiantes(): Promise<EstudianteEntidad[]>;
   registrarEncuesta(dto: RegistrarEncuestaDto): Promise<EncuestaEmocionalEntidad>;
   listarEncuestas(): Promise<EncuestaEmocionalEntidad[]>;
   listarAlertas(filtros?: FiltroAlertasDto): Promise<AlertaEntidad[]>;

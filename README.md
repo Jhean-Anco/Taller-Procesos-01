@@ -1,15 +1,16 @@
 # taller-proyectos
 
-SafeSchool AI es un sistema académico de alerta temprana de bullying en versión sin IA. El proyecto está construido como monolito modular con arquitectura hexagonal estricta tanto en backend como en frontend.
+SafeSchool AI es un sistema académico de alerta temprana de bullying con servicio local de IA, construido con arquitectura hexagonal en backend y frontend.
 
 ## Objetivo
 
-Permitir reportes emocionales y de riesgo de forma completamente anónima, calcular un puntaje de riesgo con reglas determinísticas, canalizar la primera recepción del caso al área de psicología y registrar la ejecución institucional de acciones por parte del área administrativa.
+Permitir reportes emocionales y de riesgo de forma completamente anónima, evaluar el riesgo con el servicio Python de IA, canalizar la primera recepción del caso al área de psicología y registrar la ejecución institucional de acciones por parte de alta directiva.
 
 ## Tecnologías
 
 - Backend: NestJS
 - Frontend: React + Vite
+- Servicio IA: Python + FastAPI
 - Base de datos: PostgreSQL
 - ORM: TypeORM
 - Estilos: Tailwind CSS
@@ -23,88 +24,9 @@ Permitir reportes emocionales y de riesgo de forma completamente anónima, calcu
 - Persistencia detrás de puertos de salida
 - Casos de uso detrás de puertos de entrada
 - Monolito modular
-- Sin IA, sin Docker, sin microservicios
+- Servicio IA desacoplado como proceso local FastAPI
+- Sin Docker
 - Nombres de código, clases, funciones y archivos `.ts` en español
-
-## Estructura
-
-```text
-taller-proyectos/
-├── backend/
-│   ├── src/
-│   │   ├── dominio/
-│   │   ├── aplicacion/
-│   │   ├── adaptadores/
-│   │   ├── configuracion/
-│   │   ├── aplicacion.modulo.ts
-│   │   └── principal.ts
-│   └── .env.ejemplo
-├── frontend/
-│   ├── src/
-│   │   ├── dominio/
-│   │   ├── aplicacion/
-│   │   ├── adaptadores/
-│   │   ├── aplicacion.tsx
-│   │   └── principal.tsx
-│   └── .env.ejemplo
-└── package.json
-```
-
-## Arquitectura hexagonal
-
-### Backend
-
-- `dominio/`
-  - Entidades y objetos de valor puros.
-  - Servicio de dominio `CalculadorRiesgoServicio`.
-- `aplicacion/`
-  - Casos de uso que orquestan el flujo.
-  - Puertos de entrada para lo que consume HTTP.
-  - Puertos de salida para persistencia.
-- `adaptadores/entrada/http/`
-  - Controladores Nest que traducen HTTP a casos de uso.
-- `adaptadores/salida/persistencia/typeorm/`
-  - Implementaciones concretas de repositorios TypeORM.
-  - Entidades ORM y mapeadores.
-- `configuracion/`
-  - Módulo de inyección y configuración de base de datos.
-
-### Frontend
-
-- `dominio/`
-  - Entidades que representan el modelo de la interfaz.
-- `aplicacion/`
-  - Casos de uso del cliente.
-  - Puerto de salida `ClienteApiPuerto`.
-- `adaptadores/salida/api/`
-  - Implementación HTTP real con `fetch`.
-- `adaptadores/entrada/`
-  - Contenedor React y páginas de interfaz.
-
-## Regla de riesgo sin IA
-
-El cálculo usa reglas determinísticas:
-
-- `nivelAnimo <= 2`: aumenta 25 puntos
-- `nivelAnimo == 3`: aumenta 10 puntos
-- `nivelSeguridad <= 2`: aumenta 30 puntos
-- `nivelSeguridad == 3`: aumenta 15 puntos
-- Palabras críticas detectadas:
-  - `miedo`
-  - `triste`
-  - `solo`
-  - `insultos`
-  - `golpes`
-  - `amenaza`
-- Cada palabra crítica suma 15 puntos, con tope de 45 por texto
-- El puntaje final se normaliza entre 0 y 100
-- Se genera alerta cuando `riesgo >= 40`
-
-Niveles:
-
-- `0-39`: bajo
-- `40-69`: medio
-- `70-100`: alto
 
 ## Endpoints
 
@@ -122,7 +44,27 @@ Niveles:
 - `POST /administracion/incidencias/procesos/:procesoId/avances`
 - `GET /dashboard`
 
+## Servicio IA
+
+El backend consume `services/app.py` en `http://127.0.0.1:8000`.
+
+- `GET /`
+- `POST /api/evaluar_alerta`
+
+El servicio combina NLP con el modelo `modelo_arbol.pkl` y retorna nivel, puntaje, prioridad, recomendacion, factores detectados, factores protectores, confianza y detalle tecnico. Si el servicio IA no esta disponible, el backend aplica el calculo local existente como fallback controlado.
+
+Se genera alerta cuando `puntaje_riesgo >= 40`.
+
 ## Modelo de datos
+
+### Tabla `usuarios`
+
+- `id`
+- `nombre_usuario`
+- `clave_hash`
+- `rol`
+- `activo`
+- `fecha_creacion`
 
 ### Tabla `estudiantes`
 
@@ -131,6 +73,9 @@ Niveles:
 - `codigo_anonimo`
 - `fecha_creacion`
 
+Nota:
+- En el flujo actual esta tabla representa el sujeto técnico anónimo del reporte. No existe gestión manual de estudiantes ni cuentas estudiantiles.
+
 ### Tabla `encuestas_emocionales`
 
 - `id`
@@ -138,7 +83,9 @@ Niveles:
 - `texto_emocional`
 - `nivel_animo`
 - `nivel_seguridad`
-- `puntaje_riesgo`
+- `puntaje_riesgo` calculado por IA o fallback local
+- variables IA: `grado`, `zona_junin`, `recreo_solo`, `animo_manana`, `miedo_participar`, `redes_sociales`, `apoyo_familiar`, `rendimiento`, `habilidades_sociales`, `entorno_violento`
+- resultado IA: `evaluacion_ia_disponible`, `nivel_riesgo_ia`, `prioridad_atencion_ia`, `analisis_psicologico_ia`, `accion_recomendada_ia`, `factores_detectados_ia`, `factores_protectores_ia`, `prediccion_arbol`, `sentimiento_texto_ia`, `confianza_texto_ia`, `confianza_global_ia`
 - `fecha_creacion`
 
 ### Tabla `alertas`
@@ -152,15 +99,6 @@ Niveles:
 - `mensaje_etico`
 - `fecha_creacion`
 - `ultima_actualizacion`
-
-### Tabla `usuarios`
-
-- `id`
-- `nombre_usuario`
-- `clave_hash`
-- `rol`
-- `activo`
-- `fecha_creacion`
 
 ### Tabla `seguimientos_alerta`
 
@@ -194,6 +132,16 @@ Niveles:
 - `estado`
 - `fecha_creacion`
 
+## Flujo operativo actual
+
+- El reporte estudiantil es público y anónimo; no requiere cuenta.
+- El backend envia los datos al servicio IA y registra el puntaje resultante.
+- Psicología recibe primero las incidencias de riesgo y registra acciones globales de orientación.
+- Alta directiva ve solo las incidencias anónimas derivadas por psicología, toma como base las acciones sugeridas, inicia acciones institucionales y luego registra avances o resultados sobre el mismo proceso.
+- El historial de cada incidencia integra orientaciones psicológicas, inicio administrativo, avances y resultados posteriores.
+- El dashboard administrativo se alimenta con KPIs de procesos iniciados, activos, completados, avances registrados y porcentaje de cumplimiento.
+- El sistema no diagnostica bullying; orienta revisión humana preventiva.
+
 ## Configuración
 
 ### Backend
@@ -210,8 +158,27 @@ BASE_DATOS_PUERTO=5432
 BASE_DATOS_USUARIO=postgres
 BASE_DATOS_CLAVE=postgres
 BASE_DATOS_NOMBRE=safeschool_ai
+BASE_DATOS_SINCRONIZAR=false
 JWT_SECRETO=clave_super_segura_cambiar_en_produccion
 JWT_EXPIRACION=1d
+IA_SERVICIO_URL=http://127.0.0.1:8000
+IA_SERVICIO_TIMEOUT_MS=7000
+```
+
+### Servicio IA
+
+Requisito: Python 3.11+ instalado. Los scripts buscan Python en `PYTHON`, instalaciones locales de Windows y PATH.
+
+Instalar dependencias:
+
+```bash
+npm run instalar:ia
+```
+
+Ejecutar el servicio:
+
+```bash
+npm run dev:ia
 ```
 
 ### Frontend
@@ -223,83 +190,65 @@ JWT_EXPIRACION=1d
 VITE_API_URL=http://localhost:3000
 ```
 
-## Instalación
+## SQL
 
-Desde la raíz:
+Archivos principales:
 
-```bash
-npm run instalar:todo
-```
+1. [base-datos-postgresql.sql](D:\Proyectos-React\taller-procesos\base-datos-postgresql.sql)
+   Crea toda la base desde cero con la estructura vigente.
+2. [datos-semilla-postgresql.sql](D:\Proyectos-React\taller-procesos\datos-semilla-postgresql.sql)
+   Inserta usuarios internos, reportes anónimos de ejemplo, alertas, seguimientos y procesos administrativos.
+3. [limpieza-postgresql.sql](D:\Proyectos-React\taller-procesos\limpieza-postgresql.sql)
+   Limpia las tablas operativas y reinicia secuencias para volver a sembrar en desarrollo.
+
+Orden recomendado:
+
+1. Ejecutar [base-datos-postgresql.sql](D:\Proyectos-React\taller-procesos\base-datos-postgresql.sql)
+2. Ejecutar [datos-semilla-postgresql.sql](D:\Proyectos-React\taller-procesos\datos-semilla-postgresql.sql)
+
+## Usuarios semilla
+
+- `PSICOLOGO01 / clave123`
+- `ADMIN01 / clave123`
 
 ## Ejecución
 
 Terminal 1:
 
 ```bash
-npm run dev:backend
+npm run dev:ia
 ```
 
 Terminal 2:
 
 ```bash
+npm run dev:backend
+```
+
+Terminal 3:
+
+```bash
 npm run dev:frontend
 ```
 
-## Pruebas
+Tambien se puede levantar todo en paralelo:
+
+```bash
+npm run dev
+```
+
+## Validación
 
 ```bash
 npm test
 ```
 
-Casos incluidos:
+Casos cubiertos actualmente:
 
-- iniciar sesion valido
+- iniciar sesión válido
 - calcular riesgo bajo
 - calcular riesgo medio
 - calcular riesgo alto
 - generar alerta cuando el riesgo supera el umbral
-
-## Usuarios semilla
-
-Credenciales iniciales disponibles en [datos-semilla-postgresql.sql](D:\Proyectos-React\taller-procesos\datos-semilla-postgresql.sql):
-
-- `PSICOLOGO01 / clave123`
-- `ADMIN01 / clave123`
-
-Los reportes estudiantiles ahora son publicos y anonimos, sin cuenta.
-
-## Scripts SQL unificados
-
-Usa solo estos dos archivos:
-
-1. [base-datos-postgresql.sql](D:\Proyectos-React\taller-procesos\base-datos-postgresql.sql)
-   Crea la base completa desde cero con autenticación, reportes anónimos, alertas, seguimientos y procesos administrativos.
-2. [datos-semilla-postgresql.sql](D:\Proyectos-React\taller-procesos\datos-semilla-postgresql.sql)
-   Inserta usuarios, estudiantes técnicos anónimos, encuestas, alertas, seguimientos y procesos administrativos de prueba.
-3. [limpieza-postgresql.sql](D:\Proyectos-React\taller-procesos\limpieza-postgresql.sql)
-   Limpia las tablas operativas y reinicia secuencias para volver a sembrar en desarrollo.
-
-## Flujo operativo actual
-
-- El reporte estudiantil es público y anónimo; no requiere cuenta.
-- Psicología recibe primero las incidencias de riesgo y registra acciones globales de orientación.
-- Administración ve las incidencias anónimas, toma como base las acciones sugeridas por psicología, inicia acciones institucionales y luego registra avances o resultados sobre el mismo proceso.
-- El historial de cada incidencia integra orientaciones psicológicas, inicio administrativo, avances y resultados posteriores.
-- El dashboard administrativo se alimenta con KPIs de procesos iniciados, activos, completados, avances registrados y porcentaje de cumplimiento.
-- El sistema no diagnostica bullying; orienta revisión humana preventiva.
-
-## Estado actual del entregable
-
-Se dejó implementado:
-
-- Backend NestJS con arquitectura hexagonal
-- Frontend React + Vite con arquitectura hexagonal
-- Configuración TypeORM para PostgreSQL
-- Tailwind CSS activo en frontend
-- Endpoints de autenticación interna, psicología y administración
-- Casos de uso, puertos y adaptadores
-- Pruebas unitarias del cálculo de riesgo, autenticación y generación de alerta
-
-## Nota operativa
-
-Para validar compilación, ejecución y pruebas en este entorno hace falta instalar dependencias con `npm install` en `backend` y `frontend`. Si el entorno no tiene PostgreSQL local disponible, el backend no podrá conectarse hasta que se configure una instancia accesible.
+- bloquear proceso administrativo si psicologia aun no derivo la incidencia
+- registrar proceso administrativo cuando ya existe seguimiento psicologico

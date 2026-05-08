@@ -23,5 +23,5 @@ export const obtenerConfiguracionBaseDatos = (): TypeOrmModuleOptions => ({
     AvanceProcesoAdministrativoOrmEntidad,
     SeguimientoAlertaOrmEntidad,
   ],
-  synchronize: true,
+  synchronize: (process.env.BASE_DATOS_SINCRONIZAR ?? 'false') === 'true',
 });

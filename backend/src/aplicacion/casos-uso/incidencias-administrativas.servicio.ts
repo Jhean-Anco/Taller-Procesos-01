@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { RegistrarProcesoAdministrativoDto } from '../dto/registrar-proceso-administrativo.dto';
 import { FiltroAlertasDto } from '../dto/filtro-alertas.dto';
 import { HistoriaAlertaDto } from '../dto/historia-alerta.dto';
@@ -23,7 +23,7 @@ export class IncidenciasAdministrativasServicio
   ) {}
 
   listarIncidencias(filtros?: FiltroAlertasDto): Promise<AlertaEntidad[]> {
-    return this.repositorioAlerta.listar(filtros);
+    return this.repositorioAlerta.listarEscaladasParaAdministracion(filtros);
   }
 
   async obtenerHistoriaIncidencia(id: string): Promise<HistoriaAlertaDto> {
@@ -42,6 +42,13 @@ export class IncidenciasAdministrativasServicio
     const alerta = await this.repositorioAlerta.obtenerPorId(alertaId);
     if (!alerta) {
       throw new NotFoundException('La incidencia no existe');
+    }
+
+    const historia = await this.repositorioAlerta.obtenerHistoriaPorId(alertaId);
+    if (!historia || historia.seguimientos.length === 0) {
+      throw new BadRequestException(
+        'La incidencia todavia no fue derivada por psicologia',
+      );
     }
 
     return this.repositorioProcesoAdministrativo.guardar(

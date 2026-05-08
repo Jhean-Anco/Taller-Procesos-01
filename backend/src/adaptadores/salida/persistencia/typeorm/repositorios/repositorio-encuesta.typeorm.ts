@@ -36,6 +36,10 @@ export class RepositorioEncuestaTypeorm implements RepositorioEncuestaPuerto {
     return this.repositorio.count();
   }
 
+  contarConEvaluacionIa(): Promise<number> {
+    return this.repositorio.countBy({ evaluacionIaDisponible: true });
+  }
+
   async promedioRiesgo(): Promise<number> {
     const resultado = await this.repositorio
       .createQueryBuilder('encuesta')

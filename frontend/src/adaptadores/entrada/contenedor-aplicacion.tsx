@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { IniciarSesionServicio } from '../../aplicacion/casos-uso/iniciar-sesion.servicio';
 import { FiltroAlertasDto } from '../../aplicacion/dto/filtro-alertas.dto';
+import { RegistrarEncuestaDto } from '../../aplicacion/dto/registrar-encuesta.dto';
 import { GestionarAlertasServicio } from '../../aplicacion/casos-uso/gestionar-alertas.servicio';
 import { GestionarIncidenciasAdministrativasServicio } from '../../aplicacion/casos-uso/gestionar-incidencias-administrativas.servicio';
 import { GestionarEncuestasServicio } from '../../aplicacion/casos-uso/gestionar-encuestas.servicio';
@@ -134,11 +135,7 @@ export function ContenedorAplicacion() {
     setPestanaActiva('encuestas');
   };
 
-  const registrarEncuesta = async (datos: {
-    textoEmocional: string;
-    nivelAnimo: number;
-    nivelSeguridad: number;
-  }) => {
+  const registrarEncuesta = async (datos: RegistrarEncuestaDto) => {
     await gestionarEncuestas.registrar(datos);
     await cargar();
   };

@@ -5,7 +5,6 @@ import { RegistrarProcesoAdministrativoDto } from '../../../aplicacion/dto/regis
 import { RegistrarSeguimientoAlertaDto } from '../../../aplicacion/dto/registrar-seguimiento-alerta.dto';
 import { ActualizarAlertaDto } from '../../../aplicacion/dto/actualizar-alerta.dto';
 import { RegistrarEncuestaDto } from '../../../aplicacion/dto/registrar-encuesta.dto';
-import { RegistrarEstudianteDto } from '../../../aplicacion/dto/registrar-estudiante.dto';
 import { ClienteApiPuerto } from '../../../aplicacion/puertos/salida/cliente-api.puerto';
 import { AlertaEntidad } from '../../../dominio/entidades/alerta.entidad';
 import { AvanceProcesoAdministrativoEntidad } from '../../../dominio/entidades/avance-proceso-administrativo.entidad';
@@ -15,7 +14,6 @@ import { PanelEntidad } from '../../../dominio/entidades/panel.entidad';
 import { ProcesoAdministrativoEntidad } from '../../../dominio/entidades/proceso-administrativo.entidad';
 import { SesionEntidad } from '../../../dominio/entidades/sesion.entidad';
 import { SeguimientoAlertaEntidad } from '../../../dominio/entidades/seguimiento-alerta.entidad';
-import { EstudianteEntidad } from '../../../dominio/entidades/estudiante.entidad';
 import { SesionLocal } from '../almacenamiento/sesion-local';
 
 export class ClienteApi implements ClienteApiPuerto {
@@ -59,17 +57,6 @@ export class ClienteApi implements ClienteApiPuerto {
 
   obtenerPerfilActual(): Promise<SesionEntidad['usuario']> {
     return this.solicitar('/autenticacion/perfil');
-  }
-
-  registrarEstudiante(dto: RegistrarEstudianteDto): Promise<EstudianteEntidad> {
-    return this.solicitar('/estudiantes', {
-      method: 'POST',
-      body: JSON.stringify(dto),
-    });
-  }
-
-  listarEstudiantes(): Promise<EstudianteEntidad[]> {
-    return this.solicitar('/estudiantes');
   }
 
   registrarEncuesta(
