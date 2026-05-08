@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # taller-proyectos
 
 SafeSchool AI es un sistema académico de alerta temprana de bullying con servicio local de IA, construido con arquitectura hexagonal en backend y frontend.
@@ -250,5 +251,56 @@ Casos cubiertos actualmente:
 - calcular riesgo medio
 - calcular riesgo alto
 - generar alerta cuando el riesgo supera el umbral
+<<<<<<< HEAD
 - bloquear proceso administrativo si psicologia aun no derivo la incidencia
 - registrar proceso administrativo cuando ya existe seguimiento psicologico
+=======
+
+## Usuarios semilla
+
+Credenciales iniciales disponibles en [datos-semilla-postgresql.sql](D:\Proyectos-React\taller-procesos\datos-semilla-postgresql.sql):
+
+- `PSICOLOGO01 / clave123`
+- `ADMIN01 / clave123`
+
+Los reportes estudiantiles ahora son publicos y anonimos, sin cuenta.
+
+## Scripts SQL unificados
+
+Usa solo estos dos archivos:
+
+1. [base-datos-postgresql.sql](D:\Proyectos-React\taller-procesos\base-datos-postgresql.sql)
+   Crea la base completa desde cero con autenticación, reportes anónimos, alertas, seguimientos y procesos administrativos.
+2. [datos-semilla-postgresql.sql](D:\Proyectos-React\taller-procesos\datos-semilla-postgresql.sql)
+   Inserta usuarios, estudiantes técnicos anónimos, encuestas, alertas, seguimientos y procesos administrativos de prueba.
+3. [limpieza-postgresql.sql](D:\Proyectos-React\taller-procesos\limpieza-postgresql.sql)
+   Limpia las tablas operativas y reinicia secuencias para volver a sembrar en desarrollo.
+
+## Flujo operativo actual
+
+- El reporte estudiantil es público y anónimo; no requiere cuenta.
+- Psicología recibe primero las incidencias de riesgo y registra acciones globales de orientación.
+- Administración ve las incidencias anónimas, toma como base las acciones sugeridas por psicología, inicia acciones institucionales y luego registra avances o resultados sobre el mismo proceso.
+- El historial de cada incidencia integra orientaciones psicológicas, inicio administrativo, avances y resultados posteriores.
+- El dashboard administrativo se alimenta con KPIs de procesos iniciados, activos, completados, avances registrados y porcentaje de cumplimiento.
+- El sistema no diagnostica bullying; orienta revisión humana preventiva.
+
+## Estado actual del entregable
+
+Se dejó implementado:
+
+- Backend NestJS con arquitectura hexagonal
+- Frontend React + Vite con arquitectura hexagonal
+- Configuración TypeORM para PostgreSQL
+- Tailwind CSS activo en frontend
+- Endpoints de autenticación interna, psicología y administración
+- Casos de uso, puertos y adaptadores
+- Pruebas unitarias del cálculo de riesgo, autenticación y generación de alerta
+
+## Nota operativa
+
+Para validar compilación, ejecución y pruebas en este entorno hace falta instalar dependencias con `npm install` en `backend` y `frontend`. Si el entorno no tiene PostgreSQL local disponible, el backend no podrá conectarse hasta que se configure una instancia accesible.
+=======
+# Taller-Procesos-01
+>>>>>>> 863922cbcd111a3017c42c50aab51d40d8bf0f74
+>>>>>>> e0eea8016864828a41c20f70502c5d1e8d13e17a

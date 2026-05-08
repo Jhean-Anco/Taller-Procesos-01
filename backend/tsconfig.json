@@ -1,11 +1,20 @@
 {
   "compilerOptions": {
+<<<<<<< HEAD
     "module": "commonjs",
+=======
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+>>>>>>> 863922cbcd111a3017c42c50aab51d40d8bf0f74
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
+<<<<<<< HEAD
     "target": "es2021",
     "sourceMap": true,
     "outDir": "./dist",
@@ -26,4 +35,23 @@
     "node_modules",
     "dist"
   ]
+=======
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "paths": {
+      "@src/*": ["src/*"],
+      "@contexts/*": ["src/contexts/*"],
+      "@shared/*": ["src/shared/*"]
+    },
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  }
+>>>>>>> 863922cbcd111a3017c42c50aab51d40d8bf0f74
 }

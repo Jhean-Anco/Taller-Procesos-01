@@ -3,6 +3,12 @@ uvicorn
 pydantic
 transformers
 torch
+<<<<<<< HEAD
 scikit-learn==1.6.1
 joblib
 numpy
+=======
+scikit-learn==1.8.0
+joblib
+numpy
+>>>>>>> e0eea8016864828a41c20f70502c5d1e8d13e17a
