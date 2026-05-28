@@ -4,7 +4,7 @@ import { IaService } from '../application/services/ia.service';
 import { PUERTO_PROVEEDOR_IA } from '../application/ports/output/proveedor-ia.port';
 import { REPOSITORIO_REGISTRO_SOLICITUD } from '../application/ports/output/registro-solicitud.repository';
 import { IaControlador } from './adapters/input/http/ia.controller';
-import { AdaptadorClienteOpenAi } from './adapters/output/cliente-openai.adapter';
+import { AdaptadorProveedorIaLocal } from './adapters/output/proveedor-ia-local.adapter';
 import { RepositorioRegistroSolicitudMemoria } from './persistence/in-memory/registro-solicitud-memoria.repository';
 import { RegistroSolicitudOrmEntidad } from './persistence/typeorm/entities/registro-solicitud.orm-entidad';
 import { RepositorioRegistroSolicitudTypeOrm } from './persistence/typeorm/repositories/typeorm-registro-solicitud.repository';
@@ -26,14 +26,14 @@ export class ModuloIa {
       controllers: [IaControlador],
       providers: [
         IaService,
-        AdaptadorClienteOpenAi,
+        AdaptadorProveedorIaLocal,
         ...(habilitado
           ? [RepositorioRegistroSolicitudTypeOrm]
           : [RepositorioRegistroSolicitudMemoria]),
         // El servicio de aplicación solo conoce puertos, no adaptadores concretos.
         {
           provide: PUERTO_PROVEEDOR_IA,
-          useExisting: AdaptadorClienteOpenAi,
+          useExisting: AdaptadorProveedorIaLocal,
         },
         {
           provide: REPOSITORIO_REGISTRO_SOLICITUD,

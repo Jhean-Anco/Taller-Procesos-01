@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { AlertaEntidad } from '../../dominio/entidades/alerta.entidad';
 import { SeguimientoAlertaEntidad } from '../../dominio/entidades/seguimiento-alerta.entidad';
 import { ActualizarAlertaDto } from '../dto/actualizar-alerta.dto';

@@ -8,5 +8,7 @@ var Rol;
     Rol["PSICOLOGO"] = "psicologo";
     Rol["ADMINISTRATIVO"] = "administrativo";
     Rol["ESTUDIANTE"] = "estudiante";
+    Rol["PSYCHOLOGIST"] = "PSYCHOLOGIST";
+    Rol["ADMIN_DIRECTOR"] = "ADMIN_DIRECTOR";
 })(Rol || (exports.Rol = Rol = {}));
 //# sourceMappingURL=rol.enum.js.map

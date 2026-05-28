@@ -8,11 +8,11 @@ Frontend:
 http://127.0.0.1:5173
 ```
 
-Usuarios internos:
+Usuarios internos en modo memoria:
 
 ```text
-PSICOLOGO01 / clave123
-ADMIN01 / clave123
+psicologo@agora.edu.pe / psicolog2024
+admin@agora.edu.pe / admin2024
 ```
 
 ## Caso 1 - Reporte bajo
@@ -165,10 +165,10 @@ Esperado: prioridad inmediata. La IA debe indicar revision humana urgente. Usar 
 ## Flujo recomendado de prueba
 
 1. Enviar un caso desde `Reporte anonimo`.
-2. Entrar con `PSICOLOGO01 / clave123`.
+2. Entrar con `psicologo@agora.edu.pe / psicolog2024`.
 3. Abrir `Recepcion y filtro de riesgos`.
 4. Ver la historia del caso.
 5. Revisar `Datos crudos anonimos` y `Revision inicial IA`.
 6. Registrar seguimiento psicologico.
-7. Entrar con `ADMIN01 / clave123`.
+7. Entrar con `admin@agora.edu.pe / admin2024`.
 8. Abrir incidencias derivadas y crear una accion administrativa.

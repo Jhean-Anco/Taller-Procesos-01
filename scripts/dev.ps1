@@ -96,6 +96,14 @@ Start-IfMissing `
   -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'scripts/servicio-ia.ps1') `
   -TimeoutSeconds 90
 
+Write-Host 'Vaciando datos de la BD antes de iniciar backend...'
+Push-Location $raiz
+try {
+  npm --prefix backend run db:reset-data
+} finally {
+  Pop-Location
+}
+
 Start-IfMissing `
   -Name 'backend' `
   -Port 3000 `

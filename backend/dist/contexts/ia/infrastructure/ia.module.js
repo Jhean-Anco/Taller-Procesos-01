@@ -14,7 +14,7 @@ const ia_service_1 = require("../application/services/ia.service");
 const proveedor_ia_port_1 = require("../application/ports/output/proveedor-ia.port");
 const registro_solicitud_repository_1 = require("../application/ports/output/registro-solicitud.repository");
 const ia_controller_1 = require("./adapters/input/http/ia.controller");
-const cliente_openai_adapter_1 = require("./adapters/output/cliente-openai.adapter");
+const proveedor_ia_local_adapter_1 = require("./adapters/output/proveedor-ia-local.adapter");
 const registro_solicitud_memoria_repository_1 = require("./persistence/in-memory/registro-solicitud-memoria.repository");
 const registro_solicitud_orm_entidad_1 = require("./persistence/typeorm/entities/registro-solicitud.orm-entidad");
 const typeorm_registro_solicitud_repository_1 = require("./persistence/typeorm/repositories/typeorm-registro-solicitud.repository");
@@ -29,13 +29,13 @@ let ModuloIa = ModuloIa_1 = class ModuloIa {
             controllers: [ia_controller_1.IaControlador],
             providers: [
                 ia_service_1.IaService,
-                cliente_openai_adapter_1.AdaptadorClienteOpenAi,
+                proveedor_ia_local_adapter_1.AdaptadorProveedorIaLocal,
                 ...(habilitado
                     ? [typeorm_registro_solicitud_repository_1.RepositorioRegistroSolicitudTypeOrm]
                     : [registro_solicitud_memoria_repository_1.RepositorioRegistroSolicitudMemoria]),
                 {
                     provide: proveedor_ia_port_1.PUERTO_PROVEEDOR_IA,
-                    useExisting: cliente_openai_adapter_1.AdaptadorClienteOpenAi,
+                    useExisting: proveedor_ia_local_adapter_1.AdaptadorProveedorIaLocal,
                 },
                 {
                     provide: registro_solicitud_repository_1.REPOSITORIO_REGISTRO_SOLICITUD,

@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IniciarSesionServicio } from '../aplicacion/casos-uso/iniciar-sesion.servicio';
@@ -55,7 +54,6 @@ import { RolesGuard } from '../adaptadores/entrada/http/guardias/roles.guard';
 @Module({
   imports: [
     ConfigModule,
-    PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -63,7 +61,8 @@ import { RolesGuard } from '../adaptadores/entrada/http/guardias/roles.guard';
           configService.get<string>('JWT_SECRETO') ??
           'clave_super_segura_cambiar_en_produccion',
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRACION') ?? '1d',
+          expiresIn: (configService.get<string>('JWT_EXPIRACION') ??
+            '1d') as never,
         },
       }),
     }),

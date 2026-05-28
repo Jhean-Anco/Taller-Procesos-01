@@ -1,17 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
-const aplicacion_modulo_1 = require("./aplicacion.modulo");
-async function iniciar() {
-    const aplicacion = await core_1.NestFactory.create(aplicacion_modulo_1.AplicacionModulo);
-    aplicacion.enableCors();
-    aplicacion.useGlobalPipes(new common_1.ValidationPipe({
-        whitelist: true,
-        transform: true,
-    }));
-    const puerto = Number(process.env.PUERTO ?? 3000);
-    await aplicacion.listen(puerto);
+const aplicacion_module_1 = require("./aplicacion.module");
+const configurar_aplicacion_1 = require("./configurar-aplicacion");
+const configurar_documentacion_1 = require("./shared/infrastructure/http/configurar-documentacion");
+async function bootstrap() {
+    const app = await core_1.NestFactory.create(aplicacion_module_1.AplicacionModule);
+    (0, configurar_aplicacion_1.configurarAplicacion)(app);
+    (0, configurar_documentacion_1.configurarDocumentacion)(app);
+    await app.listen(process.env.PORT ?? 3000);
 }
-void iniciar();
+void bootstrap();
 //# sourceMappingURL=principal.js.map

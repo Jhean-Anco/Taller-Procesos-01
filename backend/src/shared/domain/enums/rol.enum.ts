@@ -4,4 +4,6 @@ export enum Rol {
   PSICOLOGO = 'psicologo',
   ADMINISTRATIVO = 'administrativo',
   ESTUDIANTE = 'estudiante',
+  PSYCHOLOGIST = 'PSYCHOLOGIST',
+  ADMIN_DIRECTOR = 'ADMIN_DIRECTOR',
 }

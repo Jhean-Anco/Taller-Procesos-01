@@ -6,7 +6,6 @@ import { RUTAS_API } from './shared/infrastructure/http/rutas-api.constantes';
 
 export function configurarAplicacion(app: INestApplication): void {
   const appHttp: Express = app.getHttpAdapter().getInstance() as Express;
-  // Se habilita trust proxy para que cookies y cabeceras funcionen correctamente detrás de un proxy reverso.
   appHttp.set('trust proxy', 1);
   app.use(cookieParser());
   app.use(
@@ -17,12 +16,26 @@ export function configurarAplicacion(app: INestApplication): void {
       cookie: {
         httpOnly: true,
         sameSite: 'lax',
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
         maxAge: 1000 * 60 * 60 * 8,
       },
     }),
   );
-  // Todas las rutas quedan centralizadas bajo /api/v1 para mantener contrato uniforme.
+
+  const corsOrigins = (
+    process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://127.0.0.1:5173'
+  )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  app.enableCors({
+    origin: corsOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
   app.setGlobalPrefix(RUTAS_API.prefijo);
   app.enableVersioning({
     type: VersioningType.URI,

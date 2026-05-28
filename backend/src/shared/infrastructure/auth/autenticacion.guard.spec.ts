@@ -47,7 +47,11 @@ describe('GuardiaAutenticacion', () => {
       correo: 'docente@colegio.edu',
       rol: Rol.DOCENTE,
     };
-    const request = {
+    const request: {
+      session: { usuario: typeof usuarioSesion };
+      header: jest.Mock;
+      usuario?: typeof usuarioSesion;
+    } = {
       session: { usuario: usuarioSesion },
       header: jest.fn(),
     };
@@ -65,7 +69,10 @@ describe('GuardiaAutenticacion', () => {
       rol: Rol.PSICOLOGO,
     };
     jwtService.verify.mockReturnValue(usuarioToken);
-    const request = {
+    const request: {
+      header: jest.Mock;
+      usuario?: typeof usuarioToken;
+    } = {
       header: jest.fn().mockReturnValue('Bearer jwt-token-valido'),
     };
 

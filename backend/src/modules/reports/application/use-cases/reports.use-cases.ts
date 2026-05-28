@@ -1,0 +1,260 @@
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  AlertGeneratedBy,
+  DerivationStatus,
+  ReportStatus,
+  RiskLevel,
+} from '../../../shared/domain/enums';
+import { generarCodigoReporte, generarIdSeguro } from '../../../shared/domain/id-generator';
+import { AlertsService } from '../../../alerts/application/use-cases/alerts.service';
+import { AuditService } from '../../../audit/application/use-cases/audit.service';
+import {
+  AiAnalysis,
+  AnonymousReport,
+  Derivation,
+  PsychologicalReview,
+} from '../../domain/entities/report.entity';
+import { ReportAggregate, REPORTS_REPOSITORY, ReportFilters, ReportsRepository } from '../../domain/repositories/reports.repository';
+import { TextPrivacyService } from '../../domain/services/text-privacy.service';
+import { AI_ANALYZER, AiAnalyzerPort } from '../ports/ai-analyzer.port';
+import { CreateAnonymousReportDto, DeriveReportDto, ReviewReportDto } from '../dtos/report.dtos';
+import { ReportPresenter } from '../presenters/report.presenter';
+
+export interface InternalActor {
+  id: string;
+  ip?: string | null;
+}
+
+@Injectable()
+export class ReportsUseCases {
+  private readonly presenter = new ReportPresenter();
+  private readonly privacy = new TextPrivacyService();
+
+  constructor(
+    @Inject(REPORTS_REPOSITORY)
+    private readonly reportsRepository: ReportsRepository,
+    @Inject(AI_ANALYZER)
+    private readonly aiAnalyzer: AiAnalyzerPort,
+    private readonly alertsService: AlertsService,
+    private readonly auditService: AuditService,
+  ) {}
+
+  async createAnonymousReport(dto: CreateAnonymousReportDto) {
+    if (!dto.consent_accepted) {
+      throw new BadRequestException('Debes aceptar el aviso informativo');
+    }
+
+    const now = new Date();
+    const report = await this.reportsRepository.createReport(
+      new AnonymousReport({
+        id: generarIdSeguro('rep'),
+        publicCode: generarCodigoReporte(),
+        gradeReference: dto.grade_reference ?? null,
+        sectionReference: dto.section_reference ?? null,
+        ageRange: dto.age_range ?? null,
+        emotionalForm: dto.emotional_form,
+        messageText: dto.message_text.trim(),
+        consentAccepted: true,
+        status: ReportStatus.PENDING,
+        analysisQueueStatus: 'PENDING',
+        analysisAttempts: 0,
+        analysisNextAttemptAt: null,
+        analysisLastError: null,
+        analysisRequestedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    return this.presenter.publicResponse(report.publicCode);
+  }
+
+  async getPublicStatus(publicCode: string) {
+    const aggregate = await this.reportsRepository.findByPublicCode(publicCode);
+    if (!aggregate) {
+      throw new NotFoundException('Reporte anonimo no encontrado');
+    }
+    return this.presenter.publicStatus(aggregate);
+  }
+
+  async listForPsychologist(filters?: ReportFilters) {
+    const aggregates = await this.reportsRepository.list(filters);
+    return aggregates
+      .sort((a, b) => this.priority(b) - this.priority(a))
+      .map((aggregate) => this.presenter.psychologistList(aggregate));
+  }
+
+  async getForPsychologist(id: string, actor: InternalActor) {
+    const aggregate = await this.ensureAnalysisIfNeeded(await this.getAggregate(id));
+    await this.auditService.register({
+      actorUserId: actor.id,
+      action: 'VIEW_REPORT',
+      entityType: 'anonymous_report',
+      entityId: id,
+      ip: actor.ip,
+    });
+    return this.presenter.psychologistDetail(aggregate);
+  }
+
+  async review(id: string, dto: ReviewReportDto, actor: InternalActor) {
+    await this.getAggregate(id);
+    const review = await this.reportsRepository.saveReview(
+      new PsychologicalReview({
+        id: generarIdSeguro('rev'),
+        reportId: id,
+        psychologistId: actor.id,
+        validatedRisk: dto.validated_risk,
+        observationInternal: dto.observation_internal ?? null,
+        reviewedAt: new Date(),
+      }),
+    );
+
+    await this.alertsService.ensureForRisk(
+      id,
+      review.validatedRisk,
+      AlertGeneratedBy.PSYCHOLOGIST,
+    );
+    await this.auditService.register({
+      actorUserId: actor.id,
+      action: 'VALIDATE_RISK',
+      entityType: 'anonymous_report',
+      entityId: id,
+      metadata: { validated_risk: dto.validated_risk },
+      ip: actor.ip,
+    });
+
+    return {
+      report_id: id,
+      validated_risk: review.validatedRisk,
+      reviewed_at: review.reviewedAt.toISOString(),
+    };
+  }
+
+  async changeStatus(id: string, status: ReportStatus, actor: InternalActor) {
+    const aggregate = await this.getAggregate(id);
+    const saved = await this.reportsRepository.saveReport(
+      aggregate.report.changeStatus(status),
+    );
+    await this.auditService.register({
+      actorUserId: actor.id,
+      action: 'CHANGE_REPORT_STATUS',
+      entityType: 'anonymous_report',
+      entityId: id,
+      metadata: { status },
+      ip: actor.ip,
+    });
+    return this.presenter.psychologistList({ ...aggregate, report: saved });
+  }
+
+  async derive(id: string, dto: DeriveReportDto, actor: InternalActor) {
+    const aggregate = await this.getAggregate(id);
+    const summary =
+      dto.non_sensitive_summary?.trim() ||
+      this.privacy.buildNonSensitiveSummary(aggregate.report.messageText);
+
+    const derivation = await this.reportsRepository.saveDerivation(
+      new Derivation({
+        id: generarIdSeguro('drv'),
+        reportId: id,
+        psychologistId: actor.id,
+        adminDirectorId: dto.admin_director_id ?? null,
+        nonSensitiveSummary: summary,
+        status: DerivationStatus.PENDING,
+        createdAt: new Date(),
+      }),
+    );
+    await this.auditService.register({
+      actorUserId: actor.id,
+      action: 'DERIVE_REPORT',
+      entityType: 'anonymous_report',
+      entityId: id,
+      metadata: { derivation_id: derivation.id },
+      ip: actor.ip,
+    });
+
+    return {
+      id: derivation.id,
+      report_id: derivation.reportId,
+      non_sensitive_summary: derivation.nonSensitiveSummary,
+      status: derivation.status,
+      created_at: derivation.createdAt.toISOString(),
+    };
+  }
+
+  async delete(id: string, actor: InternalActor) {
+    await this.getAggregate(id);
+    await this.reportsRepository.deleteReport(id);
+    await this.auditService.register({
+      actorUserId: actor.id,
+      action: 'DELETE_REPORT',
+      entityType: 'anonymous_report',
+      entityId: id,
+      ip: actor.ip,
+    });
+    return { id, deleted: true };
+  }
+
+  async listForAdminSafe() {
+    const aggregates = await this.reportsRepository.list();
+    return aggregates.map((aggregate) => this.presenter.adminSafeReport(aggregate));
+  }
+
+  async getForAdmin(id: string) {
+    const aggregate = await this.ensureAnalysisIfNeeded(await this.getAggregate(id));
+    return this.presenter.adminDetailedReport(aggregate);
+  }
+
+  private async ensureAnalysisIfNeeded(aggregate: ReportAggregate): Promise<ReportAggregate> {
+    if (aggregate.analysis || (aggregate.report.analysisQueueStatus ?? 'PENDING') === 'COMPLETED') {
+      return aggregate;
+    }
+
+    const started = aggregate.report.startAnalysis();
+    await this.reportsRepository.saveReport(started);
+
+    try {
+      const analysisResult = await this.aiAnalyzer.analyze({
+        message: aggregate.report.messageText,
+        emotionalForm: aggregate.report.emotionalForm,
+      });
+
+      const analysis = await this.reportsRepository.saveAnalysis(
+        new AiAnalysis({
+          id: generarIdSeguro('ana'),
+          reportId: aggregate.report.id,
+          dominantEmotion: analysisResult.dominantEmotion,
+          emotionScores: analysisResult.emotionScores,
+          riskAi: analysisResult.riskAi,
+          confidence: analysisResult.confidence,
+          relevantSignals: analysisResult.relevantSignals,
+          modelVersion: analysisResult.modelVersion,
+          createdAt: new Date(),
+        }),
+      );
+
+      await this.alertsService.ensureForRisk(aggregate.report.id, analysis.riskAi, AlertGeneratedBy.AI);
+      await this.reportsRepository.saveReport(started.completeAnalysis());
+    } catch (error) {
+      await this.reportsRepository.saveReport(
+        started.scheduleAnalysisRetry(error instanceof Error ? error.message : 'Fallo desconocido en IA', null),
+      );
+    }
+
+    return (await this.reportsRepository.findById(aggregate.report.id)) ?? aggregate;
+  }
+
+  private async getAggregate(id: string) {
+    const aggregate = await this.reportsRepository.findById(id);
+    if (!aggregate) {
+      throw new NotFoundException('Reporte anonimo no encontrado');
+    }
+    return aggregate;
+  }
+
+  private priority(
+    aggregate: { analysis?: { riskAi: RiskLevel } | null; review?: { validatedRisk: RiskLevel } | null },
+  ) {
+    const risk = aggregate.review?.validatedRisk ?? aggregate.analysis?.riskAi ?? RiskLevel.LOW;
+    return { [RiskLevel.HIGH]: 3, [RiskLevel.MEDIUM]: 2, [RiskLevel.LOW]: 1 }[risk];
+  }
+}

@@ -19,10 +19,20 @@ function configurarAplicacion(app) {
         cookie: {
             httpOnly: true,
             sameSite: 'lax',
-            secure: false,
+            secure: process.env.NODE_ENV === 'production',
             maxAge: 1000 * 60 * 60 * 8,
         },
     }));
+    const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://127.0.0.1:5173')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
+    app.enableCors({
+        origin: corsOrigins,
+        credentials: true,
+        methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+    });
     app.setGlobalPrefix(rutas_api_constantes_1.RUTAS_API.prefijo);
     app.enableVersioning({
         type: common_1.VersioningType.URI,

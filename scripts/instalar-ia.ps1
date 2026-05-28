@@ -1,7 +1,10 @@
 $ErrorActionPreference = 'Stop'
 
 function Resolve-Python {
+  $raiz = Split-Path -Parent $PSScriptRoot
   $candidatos = @(
+    @{ File = Join-Path $raiz '.venv\Scripts\python.exe'; Args = @() },
+    @{ File = Join-Path $raiz 'ai-service\.venv\Scripts\python.exe'; Args = @() },
     @{ File = $env:PYTHON; Args = @() },
     @{ File = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"; Args = @() },
     @{ File = "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe"; Args = @() },
@@ -18,13 +21,21 @@ function Resolve-Python {
       continue
     }
 
-    & $candidato.File @($candidato.Args) --version *> $null
-    if ($LASTEXITCODE -eq 0) {
-      return $candidato
+    $preferenciaErrores = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+      & $candidato.File @($candidato.Args) --version *> $null
+      if ($LASTEXITCODE -eq 0) {
+        return $candidato
+      }
+    } catch {
+      continue
+    } finally {
+      $ErrorActionPreference = $preferenciaErrores
     }
   }
 
-  throw 'No se encontro Python. Instala Python 3.11+ o define la variable PYTHON.'
+  throw 'No se encontro Python utilizable. Instala Python 3.11+, crea .venv o define la variable PYTHON.'
 }
 
 $raiz = Split-Path -Parent $PSScriptRoot

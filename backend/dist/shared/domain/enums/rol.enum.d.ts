@@ -3,5 +3,7 @@ export declare enum Rol {
     DOCENTE = "docente",
     PSICOLOGO = "psicologo",
     ADMINISTRATIVO = "administrativo",
-    ESTUDIANTE = "estudiante"
+    ESTUDIANTE = "estudiante",
+    PSYCHOLOGIST = "PSYCHOLOGIST",
+    ADMIN_DIRECTOR = "ADMIN_DIRECTOR"
 }

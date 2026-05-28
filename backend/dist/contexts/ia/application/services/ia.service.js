@@ -63,7 +63,8 @@ ${JSON.stringify(solicitud, null, 2)}`,
     }
     extraerBloqueJson(contenido) {
         const contenidoRecortado = contenido.trim();
-        if (contenidoRecortado.startsWith('{') && contenidoRecortado.endsWith('}')) {
+        if (contenidoRecortado.startsWith('{') &&
+            contenidoRecortado.endsWith('}')) {
             return contenidoRecortado;
         }
         const coincidencia = contenidoRecortado.match(/\{[\s\S]*\}/);

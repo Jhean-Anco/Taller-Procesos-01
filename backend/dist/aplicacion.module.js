@@ -8,12 +8,12 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AplicacionModule = void 0;
 const common_1 = require("@nestjs/common");
-const common_2 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const config_1 = require("@nestjs/config");
-const auth_module_1 = require("./contexts/auth/infrastructure/auth.module");
-const ia_module_1 = require("./contexts/ia/infrastructure/ia.module");
-const convivencia_module_1 = require("./contexts/convivencia/infrastructure/convivencia.module");
+const activities_module_1 = require("./modules/activities/activities.module");
+const auth_module_1 = require("./modules/auth/auth.module");
+const dashboard_module_1 = require("./modules/dashboard/dashboard.module");
+const reports_module_1 = require("./modules/reports/reports.module");
 const salud_module_1 = require("./contexts/salud/infrastructure/salud.module");
 const autenticacion_guard_1 = require("./shared/infrastructure/auth/autenticacion.guard");
 const guardia_roles_guard_1 = require("./shared/infrastructure/auth/guardia-roles.guard");
@@ -33,11 +33,12 @@ exports.AplicacionModule = AplicacionModule = __decorate([
                 envFilePath: '.env',
                 validate: validar_entorno_1.validarEntorno,
             }),
-            auth_module_1.ModuloAuth,
             base_datos_module_1.ModuloBaseDatos.registrar(),
+            auth_module_1.AuthModule,
+            reports_module_1.ReportsModule,
+            activities_module_1.ActivitiesModule,
+            dashboard_module_1.DashboardModule,
             salud_module_1.ModuloSalud,
-            ia_module_1.ModuloIa.registrar(),
-            convivencia_module_1.ModuloConvivencia.registrar(),
         ],
         providers: [
             {
@@ -46,7 +47,7 @@ exports.AplicacionModule = AplicacionModule = __decorate([
             },
             {
                 provide: core_1.APP_PIPE,
-                useValue: new common_2.ValidationPipe({
+                useValue: new common_1.ValidationPipe({
                     whitelist: true,
                     transform: true,
                     forbidNonWhitelisted: true,

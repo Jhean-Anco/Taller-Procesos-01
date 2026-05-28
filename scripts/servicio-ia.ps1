@@ -1,7 +1,10 @@
 $ErrorActionPreference = 'Stop'
 
 function Resolve-Python {
+  $raiz = Split-Path -Parent $PSScriptRoot
   $candidatos = @(
+    @{ File = Join-Path $raiz '.venv\Scripts\python.exe'; Args = @() },
+    @{ File = Join-Path $raiz 'ai-service\.venv\Scripts\python.exe'; Args = @() },
     @{ File = $env:PYTHON; Args = @() },
     @{ File = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"; Args = @() },
     @{ File = "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe"; Args = @() },
@@ -18,17 +21,31 @@ function Resolve-Python {
       continue
     }
 
-    & $candidato.File @($candidato.Args) --version *> $null
-    if ($LASTEXITCODE -eq 0) {
-      return $candidato
+    $preferenciaErrores = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+      & $candidato.File @($candidato.Args) --version *> $null
+      if ($LASTEXITCODE -eq 0) {
+        return $candidato
+      }
+    } catch {
+      continue
+    } finally {
+      $ErrorActionPreference = $preferenciaErrores
     }
   }
 
-  throw 'No se encontro Python. Instala Python 3.11+ o define la variable PYTHON.'
+  return $null
 }
 
 $raiz = Split-Path -Parent $PSScriptRoot
 $python = Resolve-Python
 
 Set-Location $raiz
-& $python.File @($python.Args) -m uvicorn services.app:app --host 127.0.0.1 --port 8000
+if ($null -ne $python) {
+  & $python.File @($python.Args) -m uvicorn services.app:app --host 127.0.0.1 --port 8000
+  exit $LASTEXITCODE
+}
+
+Write-Warning 'No se encontro Python utilizable. Se iniciara el servicio IA local de desarrollo con Node.'
+& node scripts/servicio-ia-local.mjs

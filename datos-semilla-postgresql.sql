@@ -8,16 +8,16 @@ INSERT INTO usuarios (id, nombre_usuario, clave_hash, rol, activo, fecha_creacio
 VALUES
   (
     '90000000-0000-0000-0000-000000000001',
-    'PSICOLOGO01',
-    '$2b$10$p.gVOIBmVzDWhXJmdupxWeOau/m8p4t.IFGYdfbVuPs.aqDMYVf1C',
+    'psicologo@agora.edu.pe',
+    '$2b$10$4UbFKO5uw/lQ1UzawRRBxesnqORCAzmir0Msi4LjZnONhmaoefMIu',
     'psicologo',
     TRUE,
     NOW() - INTERVAL '7 days'
   ),
   (
     '90000000-0000-0000-0000-000000000002',
-    'ADMIN01',
-    '$2b$10$p.gVOIBmVzDWhXJmdupxWeOau/m8p4t.IFGYdfbVuPs.aqDMYVf1C',
+    'admin@agora.edu.pe',
+    '$2b$10$paSvJl9QWNi7RpbXRAyOWOUbCBZqc3L.O4QhhiEHdg1Vexx4TFD8q',
     'administrativo',
     TRUE,
     NOW() - INTERVAL '7 days'
