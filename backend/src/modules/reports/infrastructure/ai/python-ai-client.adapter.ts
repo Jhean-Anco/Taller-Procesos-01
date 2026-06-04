@@ -64,24 +64,62 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
   }
 
   private localSafeFallback(input: AiAnalysisInput): AiAnalysisResult {
-    const text = input.message.toLowerCase();
-    const high = ['matarme', 'suicidio', 'amenaza', 'golpe', 'abuso'].some((term) =>
-      text.includes(term),
+    const text = input.message
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const highTerms = ['matarme', 'suicidio', 'no quiero vivir', 'amenaza', 'golpe', 'abuso'];
+    const mediumTerms = ['miedo', 'triste', 'ansiedad', 'solo', 'burlan', 'insultan'];
+    const highMatches = highTerms.filter((term) => text.includes(term)).length;
+    const mediumMatches = mediumTerms.filter((term) => text.includes(term)).length;
+    const riskFormKeys = [
+      'fear',
+      'miedo',
+      'anxiety',
+      'ansiedad',
+      'isolation',
+      'aislamiento',
+      'school_insecurity',
+      'recreo_solo',
+      'miedo_participar',
+      'entorno_violento',
+    ];
+    const formRisk = riskFormKeys.filter((key) => {
+      const value = input.emotionalForm[key];
+      return value === true || value === 1 || value === 'true' || value === '1';
+    }).length;
+    const maxScore = Math.min(
+      0.85,
+      0.15 + mediumMatches * 0.14 + formRisk * 0.09 + highMatches * 0.28,
     );
-    const medium = ['miedo', 'triste', 'ansiedad', 'solo', 'burlan'].some((term) =>
-      text.includes(term),
-    );
+    let riskPoints = highMatches * 3.5 + mediumMatches * 0.85 + formRisk * 0.55;
+    if (maxScore >= 0.75) {
+      riskPoints += 1.8;
+    } else if (maxScore >= 0.55) {
+      riskPoints += 1;
+    } else if (maxScore >= 0.4) {
+      riskPoints += 0.4;
+    }
+    const riskAi =
+      highMatches >= 1 || riskPoints >= 6.5 || (maxScore >= 0.9 && formRisk >= 4)
+        ? RiskLevel.HIGH
+        : riskPoints >= 2.7 || (mediumMatches >= 2 && formRisk >= 1) || maxScore >= 0.65
+          ? RiskLevel.MEDIUM
+          : RiskLevel.LOW;
+    const relevantSignals = [...highTerms, ...mediumTerms]
+      .filter((term, index, terms) => text.includes(term) && terms.indexOf(term) === index)
+      .slice(0, 8);
     return {
-      dominantEmotion: high || medium ? 'fear' : 'uncertain',
+      dominantEmotion: mediumMatches > 0 || formRisk > 0 ? 'fear' : 'neutral',
       emotionScores: {
-        fear: high ? 0.75 : medium ? 0.55 : 0.2,
-        sadness: medium ? 0.5 : 0.15,
-        anxiety: medium ? 0.6 : 0.2,
-        anger: high ? 0.4 : 0.1,
+        fear: maxScore,
+        sadness: Math.min(0.75, 0.12 + (text.includes('triste') || text.includes('solo') ? 0.28 : 0)),
+        anxiety: Math.min(0.75, 0.12 + (text.includes('ansiedad') || formRisk > 1 ? 0.3 : 0)),
+        anger: Math.min(0.75, 0.1 + (highMatches > 0 ? 0.34 : 0)),
       },
-      riskAi: high ? RiskLevel.HIGH : medium ? RiskLevel.MEDIUM : RiskLevel.LOW,
+      riskAi,
       confidence: 0.35,
-      relevantSignals: ['ai_service_unavailable_local_fallback'],
+      relevantSignals: ['ai_service_unavailable_local_fallback', ...relevantSignals],
       modelVersion: 'typescript-safety-fallback',
       preliminary: true,
     };

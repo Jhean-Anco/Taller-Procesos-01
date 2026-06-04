@@ -29,18 +29,20 @@ interface ReportListItem {
   updated_at?: string;
 }
 
+interface AiAnalysisDetail {
+  dominant_emotion: string;
+  emotion_scores: Record<string, number>;
+  risk_ai: string;
+  confidence?: number | null;
+  relevant_signals: string[];
+  note: string;
+  model_version?: string | null;
+}
+
 interface ReportDetail extends ReportListItem {
   emotional_form: Record<string, unknown>;
   message_text: string;
-  ai_analysis?: {
-    dominant_emotion: string;
-    emotion_scores: Record<string, number>;
-    risk_ai: string;
-    confidence?: number | null;
-    relevant_signals: string[];
-    note: string;
-    model_version?: string | null;
-  } | null;
+  ai_analysis?: AiAnalysisDetail | null;
 }
 
 interface AlertItem {
@@ -71,15 +73,7 @@ interface AdminReportDetail extends AdminReportItem {
   age_range?: string | null;
   message_text: string;
   emotional_form: Record<string, unknown>;
-  ai_analysis?: {
-    dominant_emotion: string;
-    emotion_scores: Record<string, number>;
-    risk_ai: string;
-    confidence?: number | null;
-    relevant_signals: string[];
-    note: string;
-    model_version?: string | null;
-  } | null;
+  ai_analysis?: AiAnalysisDetail | null;
   psychological_review?: {
     validated_risk: string;
     observation_internal?: string | null;
@@ -241,6 +235,43 @@ function buildActionHint(level?: string | null) {
   if (risk === 'MEDIUM') return 'Revisar contexto, registrar observacion y programar seguimiento.';
   if (risk === 'LOW') return 'Monitorear y mantener registro preventivo.';
   return 'Esperar la clasificacion automatica.';
+}
+
+function explainAiDecision(analysis: AiAnalysisDetail) {
+  const risk = normalizeRisk(analysis.risk_ai);
+  const topEmotion = sortMetricEntries(analysis.emotion_scores)[0];
+  const emotionText = topEmotion
+    ? `${translateMetricLabel(topEmotion[0]).toLowerCase()} (${Math.round(toPercent(topEmotion[1]))}%)`
+    : analysis.dominant_emotion;
+  const signals = analysis.relevant_signals.filter(Boolean).slice(0, 4);
+
+  if (risk === 'HIGH') {
+    return `Llegó a alto porque detectó señales críticas o una acumulación fuerte de indicadores emocionales. Predomina ${emotionText}${signals.length ? ` y aparecen señales como ${signals.join(', ')}.` : '.'}`;
+  }
+  if (risk === 'MEDIUM') {
+    return `Llegó a moderado porque hay varias señales de malestar o inseguridad, pero sin una señal crítica directa suficiente para marcar alto. Predomina ${emotionText}${signals.length ? ` y se observaron ${signals.join(', ')}.` : '.'}`;
+  }
+  if (risk === 'LOW') {
+    return `Llegó a bajo porque no encontró señales críticas y la intensidad emocional estimada es baja o aislada. La señal dominante es ${emotionText}${signals.length ? `, con indicios leves como ${signals.join(', ')}.` : '.'}`;
+  }
+  return 'La IA todavía no tiene suficientes datos para explicar una clasificación.';
+}
+
+function matchesAiFilter(
+  report: { ai_model_version?: string | null; ai_degraded?: boolean },
+  aiFilter: string,
+) {
+  if (aiFilter === 'ALL') return true;
+  if (aiFilter === 'PENDING') return !report.ai_model_version;
+  if (aiFilter === 'FALLBACK') return Boolean(report.ai_degraded);
+  if (aiFilter === 'ANALYZED') return Boolean(report.ai_model_version) && !report.ai_degraded;
+  return true;
+}
+
+function includesSearch(values: Array<unknown>, search: string) {
+  const normalized = search.trim().toLowerCase();
+  if (!normalized) return true;
+  return values.some((value) => String(value ?? '').toLowerCase().includes(normalized));
 }
 
 function humanizeKey(key: string) {
@@ -630,6 +661,10 @@ function PsychologistPanel({
   const [observation, setObservation] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [riskFilter, setRiskFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [aiFilter, setAiFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
 
   const open = useCallback(async (id: string) => {
     setError('');
@@ -728,11 +763,34 @@ function PsychologistPanel({
   };
 
   const detailAnalysis = detail?.ai_analysis ?? null;
+  const filteredReports = useMemo(
+    () =>
+      reports.filter((report) => {
+        const reportRisk = normalizeRisk(report.priority_risk ?? report.validated_risk ?? report.risk_ai);
+        const statusMatches = statusFilter === 'ALL' || report.status === statusFilter;
+        const riskMatches = riskFilter === 'ALL' || reportRisk === riskFilter;
+        const aiMatches = matchesAiFilter(report, aiFilter);
+        const textMatches = includesSearch(
+          [
+            report.public_code,
+            report.grade_reference,
+            report.section_reference,
+            report.age_range,
+            report.status,
+            report.dominant_emotion,
+            riskLabel(report.priority_risk ?? report.validated_risk ?? report.risk_ai),
+          ],
+          search,
+        );
+        return statusMatches && riskMatches && aiMatches && textMatches;
+      }),
+    [aiFilter, reports, riskFilter, search, statusFilter],
+  );
   const reportInsights = useMemo(() => {
-    const total = reports.length;
-    const highRisk = reports.filter((report) => normalizeRisk(report.priority_risk ?? report.validated_risk ?? report.risk_ai) === 'HIGH').length;
-    const fallback = reports.filter((report) => report.ai_degraded).length;
-    const pending = reports.filter((report) => !report.ai_model_version).length;
+    const total = filteredReports.length;
+    const highRisk = filteredReports.filter((report) => normalizeRisk(report.priority_risk ?? report.validated_risk ?? report.risk_ai) === 'HIGH').length;
+    const fallback = filteredReports.filter((report) => report.ai_degraded).length;
+    const pending = filteredReports.filter((report) => !report.ai_model_version).length;
     return {
       total,
       highRisk,
@@ -740,7 +798,7 @@ function PsychologistPanel({
       pending,
       analyzed: total - pending,
     };
-  }, [reports]);
+  }, [filteredReports]);
   const detailEmotionEntries = useMemo(
     () =>
       detailAnalysis
@@ -752,22 +810,22 @@ function PsychologistPanel({
   );
   const psychologistRiskStats = useMemo<MetricMap>(
     () =>
-      countMetric(reports, (report) =>
+      countMetric(filteredReports, (report) =>
         riskLabel(report.priority_risk ?? report.validated_risk ?? report.risk_ai),
       ),
-    [reports],
+    [filteredReports],
   );
   const psychologistStatusStats = useMemo<MetricMap>(
-    () => countMetric(reports, (report) => reportStatusLabel(report.status)),
-    [reports],
+    () => countMetric(filteredReports, (report) => reportStatusLabel(report.status)),
+    [filteredReports],
   );
   const psychologistAiStats = useMemo<MetricMap>(
-    () => countMetric(reports, (report) => aiStateLabel(report)),
-    [reports],
+    () => countMetric(filteredReports, (report) => aiStateLabel(report)),
+    [filteredReports],
   );
   const psychologistGradeStats = useMemo<MetricMap>(
-    () => countMetric(reports, (report) => report.grade_reference ?? 'Sin grado'),
-    [reports],
+    () => countMetric(filteredReports, (report) => report.grade_reference ?? 'Sin grado'),
+    [filteredReports],
   );
 
   return (
@@ -808,17 +866,59 @@ function PsychologistPanel({
       <section className="panel list-panel">
         <div className="section-head">
           <h2>Reportes anónimos</h2>
-          <span>{reports.length} total</span>
+          <span>{filteredReports.length} de {reports.length}</span>
+        </div>
+        <div className="filter-bar">
+          <label>
+            Buscar
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Código, grado, emoción o estado"
+            />
+          </label>
+          <label>
+            Riesgo
+            <select value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)}>
+              <option value="ALL">Todos</option>
+              <option value="LOW">Bajo</option>
+              <option value="MEDIUM">Moderado</option>
+              <option value="HIGH">Alto</option>
+              <option value="SIN_IA">Sin IA</option>
+            </select>
+          </label>
+          <label>
+            Estado
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="ALL">Todos</option>
+              <option value="PENDING">Pendiente</option>
+              <option value="IN_REVIEW">En revisión</option>
+              <option value="ADDRESSED">Atendido</option>
+              <option value="CLOSED">Cerrado</option>
+            </select>
+          </label>
+          <label>
+            IA
+            <select value={aiFilter} onChange={(event) => setAiFilter(event.target.value)}>
+              <option value="ALL">Todas</option>
+              <option value="PENDING">Pendiente</option>
+              <option value="ANALYZED">Analizada</option>
+              <option value="FALLBACK">Con respaldo</option>
+            </select>
+          </label>
         </div>
         {loading && <p className="muted">Cargando reportes...</p>}
         {error && <p className="error">{error}</p>}
         {!loading && reports.length === 0 && <p className="muted">No hay reportes registrados.</p>}
+        {!loading && reports.length > 0 && filteredReports.length === 0 && (
+          <p className="muted">No hay reportes que coincidan con los filtros.</p>
+        )}
         <div className="table-list report-stack">
-          {reports.map((report) => (
+          {filteredReports.map((report) => (
             <button
               key={report.id}
               type="button"
-              className={`row-button report-row ${detail?.id === report.id ? 'is-active' : ''}`}
+              className={`row-button report-row ${riskTone(report.priority_risk ?? report.validated_risk ?? report.risk_ai)} ${detail?.id === report.id ? 'is-active' : ''}`}
               onClick={() => open(report.id)}
             >
               <span className="report-row-main">
@@ -898,6 +998,7 @@ function PsychologistPanel({
                   <div className={`ai-summary ${riskTone(detailAnalysis.risk_ai)}`}>
                     <p className="ai-summary-title">La IA ve este caso como {riskLabel(detailAnalysis.risk_ai).toLowerCase()}.</p>
                     <p className="ai-summary-body">{describeRiskNarrative(detailAnalysis.risk_ai, detailAnalysis.dominant_emotion)}</p>
+                    <p className="ai-decision">{explainAiDecision(detailAnalysis)}</p>
                     <div className="ai-summary-meta">
                       <span>Emocion dominante: {detailAnalysis.dominant_emotion}</span>
                       <span>Confianza: {confidenceLabel(detailAnalysis.confidence)}</span>
@@ -985,6 +1086,10 @@ function AdminPanel({
   const [userRole, setUserRole] = useState('PSYCHOLOGIST');
   const [userActive, setUserActive] = useState(true);
   const [createdCredential, setCreatedCredential] = useState<{ email: string; password: string; role: string } | null>(null);
+  const [adminRiskFilter, setAdminRiskFilter] = useState('ALL');
+  const [adminStatusFilter, setAdminStatusFilter] = useState('ALL');
+  const [adminAiFilter, setAdminAiFilter] = useState('ALL');
+  const [adminSearch, setAdminSearch] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -1192,6 +1297,29 @@ function AdminPanel({
     }),
     [summary],
   );
+  const filteredAdminReports = useMemo(
+    () =>
+      adminReports.filter((report) => {
+        const reportRisk = normalizeRisk(report.risk);
+        const statusMatches = adminStatusFilter === 'ALL' || report.status === adminStatusFilter;
+        const riskMatches = adminRiskFilter === 'ALL' || reportRisk === adminRiskFilter;
+        const aiMatches = matchesAiFilter(report, adminAiFilter);
+        const textMatches = includesSearch(
+          [
+            report.public_code,
+            report.grade_reference,
+            report.section_reference,
+            report.status,
+            report.dominant_emotion,
+            report.summary,
+            riskLabel(report.risk),
+          ],
+          adminSearch,
+        );
+        return statusMatches && riskMatches && aiMatches && textMatches;
+      }),
+    [adminAiFilter, adminReports, adminRiskFilter, adminSearch, adminStatusFilter],
+  );
   const selectedReportActivities = useMemo(
     () =>
       selectedAdminReport
@@ -1248,16 +1376,55 @@ function AdminPanel({
 
       <div className="admin-workbench">
         <div className="admin-report-management">
-          <section className="panel admin-report-sidebar">
+      <section className="panel admin-report-sidebar">
         <div className="section-head">
           <h2>Reportes anónimos</h2>
-          <span>{adminReports.length} total</span>
+          <span>{filteredAdminReports.length} de {adminReports.length}</span>
+        </div>
+        <div className="filter-bar admin-filter-bar">
+          <label>
+            Buscar
+            <input
+              value={adminSearch}
+              onChange={(event) => setAdminSearch(event.target.value)}
+              placeholder="Código, grado, resumen o emoción"
+            />
+          </label>
+          <label>
+            Riesgo
+            <select value={adminRiskFilter} onChange={(event) => setAdminRiskFilter(event.target.value)}>
+              <option value="ALL">Todos</option>
+              <option value="LOW">Bajo</option>
+              <option value="MEDIUM">Moderado</option>
+              <option value="HIGH">Alto</option>
+              <option value="SIN_IA">Sin IA</option>
+            </select>
+          </label>
+          <label>
+            Estado
+            <select value={adminStatusFilter} onChange={(event) => setAdminStatusFilter(event.target.value)}>
+              <option value="ALL">Todos</option>
+              <option value="PENDING">Pendiente</option>
+              <option value="IN_REVIEW">En revisión</option>
+              <option value="ADDRESSED">Atendido</option>
+              <option value="CLOSED">Cerrado</option>
+            </select>
+          </label>
+          <label>
+            IA
+            <select value={adminAiFilter} onChange={(event) => setAdminAiFilter(event.target.value)}>
+              <option value="ALL">Todas</option>
+              <option value="PENDING">Pendiente</option>
+              <option value="ANALYZED">Analizada</option>
+              <option value="FALLBACK">Con respaldo</option>
+            </select>
+          </label>
         </div>
         <div className="table-list report-grid">
-          {adminReports.map((report) => (
+          {filteredAdminReports.map((report) => (
             <button
               type="button"
-              className={`row-button admin-report-row ${selectedAdminReportId === report.id ? 'is-active' : ''}`}
+              className={`row-button admin-report-row ${riskTone(report.risk)} ${selectedAdminReportId === report.id ? 'is-active' : ''}`}
               key={report.id}
               onClick={() => openAdminReport(report.id)}
             >
@@ -1288,6 +1455,9 @@ function AdminPanel({
             </button>
           ))}
           {adminReports.length === 0 && <p className="muted">No hay reportes para mostrar.</p>}
+          {adminReports.length > 0 && filteredAdminReports.length === 0 && (
+            <p className="muted">No hay reportes que coincidan con los filtros.</p>
+          )}
         </div>
       </section>
 
@@ -1362,6 +1532,7 @@ function AdminPanel({
                         selectedAdminReport.ai_analysis.dominant_emotion,
                       )}
                     </p>
+                    <p className="ai-decision">{explainAiDecision(selectedAdminReport.ai_analysis)}</p>
                     <div className="ai-summary-meta">
                       <span>Emoción dominante: {selectedAdminReport.ai_analysis.dominant_emotion}</span>
                       <span>Confianza: {confidenceLabel(selectedAdminReport.ai_analysis.confidence)}</span>

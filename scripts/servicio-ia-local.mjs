@@ -49,6 +49,19 @@ const MEDIUM_RISK_TERMS = [
   'fotos',
 ];
 
+const RISK_FORM_KEYS = [
+  'fear',
+  'miedo',
+  'anxiety',
+  'ansiedad',
+  'isolation',
+  'aislamiento',
+  'school_insecurity',
+  'recreo_solo',
+  'miedo_participar',
+  'entorno_violento',
+];
+
 function normalize(text) {
   return String(text ?? '')
     .toLowerCase()
@@ -83,28 +96,26 @@ function scoreEmotions(text, emotionalForm) {
 }
 
 function hasTruthyFlag(value) {
-  return value === true || value === 1 || value === 'true' || value === '1';
+  return value === true || value === 1 || value === 'true' || value === '1' || value === 'si' || value === 'sí' || value === 'yes';
 }
 
 function classifyRisk(text, scores, emotionalForm) {
   const highMatches = HIGH_RISK_TERMS.filter((term) => text.includes(term)).length;
   const mediumMatches = MEDIUM_RISK_TERMS.filter((term) => text.includes(term)).length;
-  const formRisk = [
-    'fear',
-    'miedo',
-    'anxiety',
-    'ansiedad',
-    'isolation',
-    'aislamiento',
-    'school_insecurity',
-    'recreo_solo',
-    'miedo_participar',
-    'entorno_violento',
-  ].filter((key) => hasTruthyFlag(emotionalForm[key])).length;
+  const formRisk = RISK_FORM_KEYS.filter((key) => hasTruthyFlag(emotionalForm[key])).length;
   const maxScore = Math.max(...Object.values(scores));
 
-  if (highMatches >= 1 || maxScore >= 0.78 || formRisk >= 5) return 'HIGH';
-  if (mediumMatches >= 2 || maxScore >= 0.45 || formRisk >= 2) return 'MEDIUM';
+  let riskPoints = highMatches * 3.5 + mediumMatches * 0.85 + formRisk * 0.55;
+  if (maxScore >= 0.75) {
+    riskPoints += 1.8;
+  } else if (maxScore >= 0.55) {
+    riskPoints += 1;
+  } else if (maxScore >= 0.4) {
+    riskPoints += 0.4;
+  }
+
+  if (highMatches >= 1 || riskPoints >= 6.5 || (maxScore >= 0.9 && formRisk >= 4)) return 'HIGH';
+  if (riskPoints >= 2.7 || (mediumMatches >= 2 && formRisk >= 1) || maxScore >= 0.65) return 'MEDIUM';
   return 'LOW';
 }
 
@@ -126,9 +137,13 @@ function analyzePayload(payload) {
     ? payload.emotional_form
     : {};
   const emotionScores = scoreEmotions(text, emotionalForm);
-  const dominantEmotion = Object.entries(emotionScores)
-    .sort((a, b) => b[1] - a[1])[0][0];
   const relevantSignals = detectSignals(text);
+  const hasFormRisk = RISK_FORM_KEYS.some((key) => hasTruthyFlag(emotionalForm[key]));
+  const dominantEmotion = relevantSignals.length === 0
+    && !hasFormRisk
+    && Math.max(...Object.values(emotionScores)) <= 0.1
+    ? 'neutral'
+    : Object.entries(emotionScores).sort((a, b) => b[1] - a[1])[0][0];
   const riskAi = classifyRisk(text, emotionScores, emotionalForm);
   const confidence = bounded(0.35 + relevantSignals.length * 0.06 + Math.max(...Object.values(emotionScores)) * 0.25);
 

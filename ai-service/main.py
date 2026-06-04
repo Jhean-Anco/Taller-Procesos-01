@@ -71,6 +71,19 @@ MEDIUM_RISK_TERMS = [
     "fotos",
 ]
 
+RISK_FORM_KEYS = [
+    "fear",
+    "miedo",
+    "anxiety",
+    "ansiedad",
+    "isolation",
+    "aislamiento",
+    "school_insecurity",
+    "recreo_solo",
+    "miedo_participar",
+    "entorno_violento",
+]
+
 
 def normalize(text: str) -> str:
     normalized = unicodedata.normalize("NFD", text.lower())
@@ -109,29 +122,31 @@ def detect_signals(text: str) -> list[str]:
     return signals[:8]
 
 
+def is_truthy(value: Any) -> bool:
+    return value in [True, 1, "true", "1", "si", "sí", "yes"]
+
+
 def classify_risk(text: str, scores: dict[str, float], emotional_form: dict[str, Any]) -> str:
     high_matches = sum(1 for term in HIGH_RISK_TERMS if term in text)
     medium_matches = sum(1 for term in MEDIUM_RISK_TERMS if term in text)
-    form_risk = sum(
-        1
-        for key in [
-            "fear",
-            "miedo",
-            "anxiety",
-            "ansiedad",
-            "isolation",
-            "aislamiento",
-            "school_insecurity",
-            "recreo_solo",
-            "miedo_participar",
-            "entorno_violento",
-        ]
-        if emotional_form.get(key) in [True, 1, "true", "1"]
-    )
+    form_risk = sum(1 for key in RISK_FORM_KEYS if is_truthy(emotional_form.get(key)))
+    max_score = max(scores.values())
 
-    if high_matches >= 1 or max(scores.values()) >= 0.78 or form_risk >= 5:
+    risk_points = high_matches * 3.5 + medium_matches * 0.85 + form_risk * 0.55
+    if max_score >= 0.75:
+        risk_points += 1.8
+    elif max_score >= 0.55:
+        risk_points += 1.0
+    elif max_score >= 0.4:
+        risk_points += 0.4
+
+    if high_matches >= 1 or risk_points >= 6.5 or (max_score >= 0.9 and form_risk >= 4):
         return "HIGH"
-    if medium_matches >= 2 or max(scores.values()) >= 0.45 or form_risk >= 2:
+    if (
+        risk_points >= 2.7
+        or (medium_matches >= 2 and form_risk >= 1)
+        or max_score >= 0.65
+    ):
         return "MEDIUM"
     return "LOW"
 
@@ -148,9 +163,14 @@ def analyze(payload: AnalyzeRequest) -> AnalyzeResponse:
         raise HTTPException(status_code=400, detail="message is required")
 
     scores = score_emotions(text, payload.emotional_form)
-    dominant_emotion = max(scores, key=scores.get)
     risk = classify_risk(text, scores, payload.emotional_form)
     signals = detect_signals(text)
+    has_form_risk = any(is_truthy(payload.emotional_form.get(key)) for key in RISK_FORM_KEYS)
+    dominant_emotion = (
+        "neutral"
+        if not signals and not has_form_risk and max(scores.values()) <= 0.1
+        else max(scores, key=scores.get)
+    )
     confidence = round(min(0.85, 0.35 + len(signals) * 0.06 + max(scores.values()) * 0.25), 4)
 
     return AnalyzeResponse(
