@@ -14,7 +14,11 @@ const backendRoot = join(scriptDir, '..');
 const fileEnv = readEnvFile(join(backendRoot, '.env'));
 const env = { ...fileEnv, ...process.env };
 
-const total = Math.max(1, Number(env.CARGA_TOTAL ?? 500));
+const parsedTotal = Number(env.CARGA_TOTAL ?? 1000);
+const total =
+  Number.isFinite(parsedTotal) && parsedTotal > 0
+    ? Math.floor(parsedTotal)
+    : 1000;
 const databaseConfig = resolveDatabaseConfig(env);
 
 const client = new Client(databaseConfig);
@@ -72,59 +76,98 @@ async function main() {
   const now = new Date();
   let inserted = 0;
 
-  for (let index = 0; index < total; index += 1) {
-    const theme = pick(index, themes);
-    const publicCode = uniquePublicCode(index);
-    const messageText = `${pick(index, theme.messages)} Caso ${String(index + 1).padStart(3, '0')}.`;
-    const id = `rep_massivo_${String(index + 1).padStart(6, '0')}`;
-
-    await client.query(
-      `
-        INSERT INTO anonymous_reports (
-          id,
-          public_code,
-          grade_reference,
-          section_reference,
-          age_range,
-          emotional_form,
-          message_text,
-          consent_accepted,
-          status,
-          analysis_queue_status,
-          analysis_attempts,
-          analysis_next_attempt_at,
-          analysis_last_error,
-          analysis_requested_at,
-          created_at,
-          updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
-        )
-      `,
-      [
-        id,
-        publicCode,
-        theme.grade_reference,
-        theme.section_reference,
-        theme.age_range,
-        JSON.stringify(theme.emotional_form),
-        messageText,
-        true,
-        'PENDING',
-        'PENDING',
-        0,
-        null,
-        null,
-        now,
-        now,
-        now,
-      ],
-    );
-    inserted += 1;
-
-    if ((index + 1) % 25 === 0 || index + 1 === total) {
-      console.log(`  ${inserted}/${total} insertados`);
+  await client.query('BEGIN');
+  try {
+    const [previousMassiveLoad] = (
+      await client.query(
+        "SELECT COUNT(*)::int AS total FROM anonymous_reports WHERE id LIKE 'rep_massivo_%'",
+      )
+    ).rows;
+    await client.query('CALL sp_limpiar_carga_reportes_masivos()');
+    if (previousMassiveLoad.total > 0) {
+      console.log(
+        `  ${previousMassiveLoad.total} reportes masivos previos retirados`,
+      );
     }
+
+    for (let index = 0; index < total; index += 1) {
+      const theme = pick(index, themes);
+      const publicCode = uniquePublicCode(index);
+      const messageText = `${pick(index, theme.messages)} Caso ${String(
+        index + 1,
+      ).padStart(3, '0')}.`;
+      const id = `rep_massivo_${String(index + 1).padStart(6, '0')}`;
+
+      await client.query(
+        `
+          INSERT INTO anonymous_reports (
+            id,
+            public_code,
+            grade_reference,
+            section_reference,
+            age_range,
+            emotional_form,
+            message_text,
+            consent_accepted,
+            status,
+            analysis_queue_status,
+            analysis_attempts,
+            analysis_next_attempt_at,
+            analysis_last_error,
+            analysis_requested_at,
+            created_at,
+            updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+          )
+        `,
+        [
+          id,
+          publicCode,
+          theme.grade_reference,
+          theme.section_reference,
+          theme.age_range,
+          JSON.stringify(theme.emotional_form),
+          messageText,
+          true,
+          'PENDING',
+          'PENDING',
+          0,
+          null,
+          null,
+          now,
+          now,
+          now,
+        ],
+      );
+      inserted += 1;
+
+      if ((index + 1) % 25 === 0 || index + 1 === total) {
+        console.log(`  ${inserted}/${total} insertados`);
+      }
+    }
+
+    const [validation] = (
+      await client.query('SELECT * FROM sp_validar_carga_reportes_masivos($1)', [
+        total,
+      ])
+    ).rows;
+    if (!validation?.carga_exitosa) {
+      throw new Error(
+        validation?.observacion ??
+          'No se pudo validar la carga masiva para psicologia',
+      );
+    }
+
+    console.log(
+      `  Validacion: ${validation.total_masivos} masivos, ${validation.total_visibles_psicologo} visibles para psicologia, ${validation.analisis_masivos} analisis IA`,
+    );
+    console.log(`  ${validation.observacion}`);
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   }
 
   await client.end();

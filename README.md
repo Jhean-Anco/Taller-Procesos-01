@@ -85,7 +85,7 @@ Usuarios seed en modo memoria:
 
 ## Carga masiva manual
 
-Para cargar 500 reportes anonimos directamente en la base de datos, ejecuta:
+Para cargar 1000 reportes anonimos directamente en la base de datos, ejecuta:
 
 ```powershell
 npm run seed:carga-masiva
@@ -94,14 +94,26 @@ npm run seed:carga-masiva
 Variables opcionales:
 
 ```powershell
-$env:CARGA_TOTAL='500'
+$env:CARGA_TOTAL='1000'
 ```
 
-El script inserta los reportes directo en PostgreSQL y no pasa por la IA.
+El script inserta los reportes directo en PostgreSQL, retira cargas masivas previas y no crea registros en `ai_analyses`.
+Al finalizar ejecuta `sp_validar_carga_reportes_masivos` y debe mostrar los reportes visibles para psicologia.
 
-La IA se calcula cuando el usuario abre el detalle de un reporte en psicologia o administracion.
+La IA se calcula cuando el usuario abre el detalle de un reporte en psicologia o administracion. Hasta ese momento el reporte queda como dato crudo.
 
-Al levantar `npm run dev`, el entorno vacia los datos de la base de datos y conserva las tablas. Luego puedes cargar datos desde el formulario publico o con `npm run seed:carga-masiva`.
+Al levantar `npm run dev`, el entorno usa PostgreSQL por defecto, vacia los datos de la base de datos y conserva las tablas. Ejecuta `npm run seed:carga-masiva` despues de iniciar el entorno si quieres ver los 1000 datos de prueba en la aplicacion.
+
+Si el psicologo no ve reportes, reinicia el backend con `npm run dev:stop` y `npm run dev`, valida que `backend/.env` y `frontend/.env` apunten a la misma API/base de datos (`DATABASE_NAME=safeschool_ai` y `VITE_API_URL=http://localhost:3000/api/v1`) y vuelve a ejecutar la carga despues de iniciar el entorno.
+
+## Procedimientos almacenados
+
+La migracion `backend/migrations/001_pmv_alertas_tempranas.sql` consigna procedimientos y funciones almacenadas para reportes:
+
+- `sp_limpiar_carga_reportes_masivos()` retira cargas masivas previas antes de sembrar nuevamente.
+- `sp_validar_carga_reportes_masivos(expected_total)` valida total masivo, visibilidad para psicologia y que la IA quede pendiente.
+- `sp_dashboard_resumen()` consolida reportes, alertas, actividades y estado IA.
+- `sp_dashboard_estadisticas_riesgo(min_group_size)`, `sp_dashboard_estadisticas_emocion(min_group_size)`, `sp_dashboard_tendencia_reportes(min_group_size)` y `sp_dashboard_estadisticas_grado(min_group_size)` entregan agregados para dashboard con proteccion de anonimato.
 
 ## Endpoints PMV
 

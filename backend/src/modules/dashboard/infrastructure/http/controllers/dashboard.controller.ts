@@ -1,8 +1,13 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { Rol } from '../../../../../shared/domain/enums/rol.enum';
 import { ProtegerRuta } from '../../../../../shared/infrastructure/auth/proteger-ruta.decorator';
+import { UsuarioAutenticado } from '../../../../../shared/infrastructure/auth/usuario-autenticado.interface';
 import { DashboardService } from '../../../application/use-cases/dashboard.service';
+import { ProcessAnalysisQueueDto } from '../../../../reports/application/dtos/report.dtos';
 import { ReportsUseCases } from '../../../../reports/application/use-cases/reports.use-cases';
+
+type RequestWithUser = Request & { usuario?: UsuarioAutenticado };
 
 @Controller({ path: 'dashboard', version: '1' })
 @ProtegerRuta(Rol.ADMIN_DIRECTOR)
@@ -50,5 +55,16 @@ export class DashboardController {
   @Get('reports/:id')
   reportDetail(@Param('id') id: string) {
     return this.reportsUseCases.getForAdmin(id);
+  }
+
+  @Post('analysis/process-pending')
+  processPendingAnalysis(
+    @Body() dto: ProcessAnalysisQueueDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.reportsUseCases.processPendingAnalyses(dto.limit ?? 10, {
+      id: request.usuario?.id ?? 'unknown',
+      ip: request.ip,
+    });
   }
 }

@@ -100,6 +100,31 @@ interface AdminReportDetail extends AdminReportItem {
   };
 }
 
+interface PreventiveActivityItem {
+  id: string;
+  report_id?: string | null;
+  title: string;
+  description: string;
+  objective: string;
+  activity_type: string;
+  responsible: string;
+  scheduled_date: string;
+  status: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface InternalUserItem {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 type MetricMap = Record<string, number | string>;
 
 type RiskTier = 'LOW' | 'MEDIUM' | 'HIGH' | 'SIN_IA';
@@ -245,9 +270,23 @@ function translateMetricLabel(label: string) {
     classified: 'Clasificado',
     reportes: 'Reportes',
     clasificados: 'Clasificados',
+    ia_pendiente: 'IA pendiente',
+    ia_analizada: 'IA analizada',
+    ia_con_respaldo: 'IA con respaldo',
+    sin_ia: 'Sin IA',
+    sin_grado: 'Sin grado',
+    sin_emocion: 'Sin emocion',
   };
 
   return labels[normalized] ?? humanizeKey(label);
+}
+
+function countMetric<T>(items: T[], selector: (item: T) => string): MetricMap {
+  return items.reduce<MetricMap>((acc, item) => {
+    const key = selector(item);
+    acc[key] = Number(acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
 }
 
 function formatDetailValue(value: unknown) {
@@ -711,6 +750,25 @@ function PsychologistPanel({
         : [],
     [detailAnalysis],
   );
+  const psychologistRiskStats = useMemo<MetricMap>(
+    () =>
+      countMetric(reports, (report) =>
+        riskLabel(report.priority_risk ?? report.validated_risk ?? report.risk_ai),
+      ),
+    [reports],
+  );
+  const psychologistStatusStats = useMemo<MetricMap>(
+    () => countMetric(reports, (report) => reportStatusLabel(report.status)),
+    [reports],
+  );
+  const psychologistAiStats = useMemo<MetricMap>(
+    () => countMetric(reports, (report) => aiStateLabel(report)),
+    [reports],
+  );
+  const psychologistGradeStats = useMemo<MetricMap>(
+    () => countMetric(reports, (report) => report.grade_reference ?? 'Sin grado'),
+    [reports],
+  );
 
   return (
     <main className="workspace">
@@ -741,6 +799,11 @@ function PsychologistPanel({
           La columna de la izquierda prioriza urgencia. El panel central traduce la señal IA a criterios de seguimiento.
         </p>
       </section>
+
+      <BarChart title="Riesgo priorizado" data={psychologistRiskStats} note="IA o validacion humana" />
+      <BarChart title="Estado de revision" data={psychologistStatusStats} note="Flujo psicologico" />
+      <BarChart title="Cobertura IA" data={psychologistAiStats} note="Pendiente, analizada o respaldo" />
+      <BarChart title="Reportes por grado" data={psychologistGradeStats} note="Distribucion de carga" />
 
       <section className="panel list-panel">
         <div className="section-head">
@@ -906,29 +969,35 @@ function AdminPanel({
   const [emotionStats, setEmotionStats] = useState<MetricMap>({});
   const [trendStats, setTrendStats] = useState<MetricMap>({});
   const [gradeStats, setGradeStats] = useState<MetricMap>({});
-  const [activities, setActivities] = useState<Array<Record<string, string>>>([]);
+  const [activities, setActivities] = useState<PreventiveActivityItem[]>([]);
+  const [users, setUsers] = useState<InternalUserItem[]>([]);
   const [adminReports, setAdminReports] = useState<AdminReportItem[]>([]);
   const [selectedAdminReportId, setSelectedAdminReportId] = useState<string | null>(null);
   const [selectedAdminReport, setSelectedAdminReport] = useState<AdminReportDetail | null>(null);
   const [adminDetailLoading, setAdminDetailLoading] = useState(false);
+  const [analysisProcessing, setAnalysisProcessing] = useState(false);
   const [error, setError] = useState('');
   const [title, setTitle] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userPassword, setUserPassword] = useState('Temporal123*');
   const [userRole, setUserRole] = useState('PSYCHOLOGIST');
+  const [userActive, setUserActive] = useState(true);
   const [createdCredential, setCreatedCredential] = useState<{ email: string; password: string; role: string } | null>(null);
 
   const load = useCallback(async () => {
     setError('');
     try {
-      const [summaryData, riskData, emotionData, trendData, gradeData, activityData, reportsData] = await Promise.all([
+      const [summaryData, riskData, emotionData, trendData, gradeData, activityData, reportsData, usersData] = await Promise.all([
         api<Record<string, unknown>>('/dashboard/summary', token),
         api<MetricMap>('/dashboard/risk-statistics', token),
         api<MetricMap>('/dashboard/emotion-statistics', token),
         api<MetricMap>('/dashboard/anonymous-reports-trends', token),
         api<MetricMap>('/dashboard/grade-statistics', token),
-        api<Array<Record<string, string>>>('/preventive-activities', token),
+        api<PreventiveActivityItem[]>('/preventive-activities', token),
         api<AdminReportItem[]>('/dashboard/reports', token),
+        api<InternalUserItem[]>('/users', token),
       ]);
       setSummary(summaryData);
       setRiskStats(riskData);
@@ -937,6 +1006,7 @@ function AdminPanel({
       setGradeStats(gradeData);
       setActivities(activityData);
       setAdminReports(reportsData);
+      setUsers(usersData);
       const nextId =
         (selectedAdminReportId && reportsData.some((report) => report.id === selectedAdminReportId)
           ? selectedAdminReportId
@@ -983,6 +1053,23 @@ function AdminPanel({
     }
   }, [token]);
 
+  const processPendingAnalysis = async () => {
+    setAnalysisProcessing(true);
+    setError('');
+    try {
+      const result = await api<{ claimed: number; completed: number }>('/dashboard/analysis/process-pending', token, {
+        method: 'POST',
+        body: JSON.stringify({ limit: 25 }),
+      });
+      await load();
+      notify(`IA procesada: ${result.completed}/${result.claimed} reportes guardados en BD`, 'success');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo procesar la IA pendiente.');
+    } finally {
+      setAnalysisProcessing(false);
+    }
+  };
+
   useEffect(() => {
     void load();
   }, [token]);
@@ -997,12 +1084,17 @@ function AdminPanel({
 
   const createActivity = async (event: FormEvent) => {
     event.preventDefault();
+    if (!selectedAdminReport) {
+      setError('Selecciona un reporte antes de registrar una actividad preventiva.');
+      return;
+    }
     await api('/preventive-activities', token, {
       method: 'POST',
       body: JSON.stringify({
+        report_id: selectedAdminReport.id,
         title,
-        description: 'Actividad preventiva institucional basada en tendencias agregadas.',
-        objective: 'Reducir senales de riesgo y mejorar convivencia.',
+        description: `Actividad vinculada al reporte ${selectedAdminReport.public_code}: ${selectedAdminReport.summary}`,
+        objective: `Dar seguimiento preventivo al reporte ${selectedAdminReport.public_code}.`,
         activity_type: 'taller',
         responsible: 'Convivencia escolar',
         scheduled_date: new Date().toISOString(),
@@ -1013,25 +1105,62 @@ function AdminPanel({
     await load();
   };
 
-  const createUser = async (event: FormEvent) => {
+  const resetUserForm = () => {
+    setSelectedUserId(null);
+    setUserName('');
+    setUserEmail('');
+    setUserPassword('Temporal123*');
+    setUserRole('PSYCHOLOGIST');
+    setUserActive(true);
+  };
+
+  const editUser = (user: InternalUserItem) => {
+    setSelectedUserId(user.id);
+    setUserName(user.name);
+    setUserEmail(user.email);
+    setUserRole(user.role);
+    setUserActive(user.active);
+    setUserPassword('Temporal123*');
+  };
+
+  const saveUser = async (event: FormEvent) => {
     event.preventDefault();
     setError('');
     try {
-      await api('/users', token, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: userEmail.split('@')[0] || 'Usuario interno',
-          email: userEmail,
-          password: userPassword,
-          role: userRole,
-        }),
-      });
-      setCreatedCredential({ email: userEmail, password: userPassword, role: userRole });
-      setUserEmail('');
-      setUserPassword('Temporal123*');
-      notify(`Perfil creado: ${userEmail}`);
+      if (selectedUserId) {
+        const current = users.find((user) => user.id === selectedUserId);
+        await api(`/users/${selectedUserId}`, token, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            name: userName || userEmail.split('@')[0] || 'Usuario interno',
+            email: userEmail,
+            role: userRole,
+          }),
+        });
+        if (current && current.active !== userActive) {
+          await api(`/users/${selectedUserId}/status`, token, {
+            method: 'PATCH',
+            body: JSON.stringify({ active: userActive }),
+          });
+        }
+        notify(`Perfil actualizado: ${userEmail}`);
+      } else {
+        await api('/users', token, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: userName || userEmail.split('@')[0] || 'Usuario interno',
+            email: userEmail,
+            password: userPassword,
+            role: userRole,
+          }),
+        });
+        setCreatedCredential({ email: userEmail, password: userPassword, role: userRole });
+        notify(`Perfil creado: ${userEmail}`);
+      }
+      resetUserForm();
+      await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo crear el usuario.');
+      setError(caught instanceof Error ? caught.message : 'No se pudo guardar el usuario.');
     }
   };
 
@@ -1047,6 +1176,13 @@ function AdminPanel({
     ],
     [summary],
   );
+  const summaryChartStats = useMemo<MetricMap>(
+    () =>
+      Object.fromEntries(
+        statCards.map(([label, value]) => [label, Number(value ?? 0)]),
+      ),
+    [statCards],
+  );
 
   const aiPipelineStats = useMemo<MetricMap>(
     () => ({
@@ -1056,6 +1192,13 @@ function AdminPanel({
     }),
     [summary],
   );
+  const selectedReportActivities = useMemo(
+    () =>
+      selectedAdminReport
+        ? activities.filter((activity) => activity.report_id === selectedAdminReport.id)
+        : [],
+    [activities, selectedAdminReport],
+  );
 
   return (
     <main className="admin-grid">
@@ -1064,31 +1207,48 @@ function AdminPanel({
           <p className="error">{error}</p>
         </section>
       )}
-      <section className="panel full-row insight-strip admin-hero">
-        <div className="section-head">
-          <h2>IA y carga operativa</h2>
-          <span>{String(summary.reports_received ?? 0)} reportes</span>
-        </div>
-        <p className="muted">
-          La vista prioriza volumen, riesgo y estado de la IA para ver el comportamiento del sistema bajo estrés.
-        </p>
-      </section>
-      <section className="panel stat-strip">
-        {statCards.map(([label, value]) => (
-          <div key={label as string}>
-            <span>{label}</span>
-            <strong>{String(value ?? 0)}</strong>
+      <section className="admin-dashboard-top">
+        <section className="panel insight-strip admin-hero">
+          <div className="section-head">
+            <h2>Resumen de reportes</h2>
+            <span>{String(summary.reports_received ?? 0)} reportes</span>
           </div>
-        ))}
+          <p className="muted">
+            Vista estática de volumen, riesgo, emociones y estado IA antes de gestionar casos individuales.
+          </p>
+          <div className="admin-hero-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={processPendingAnalysis}
+              disabled={analysisProcessing || Number(summary.ai_pending_reports ?? 0) <= 0}
+            >
+              {analysisProcessing ? 'Procesando IA...' : 'Procesar IA pendiente'}
+            </button>
+            <span>{String(summary.ai_pending_reports ?? 0)} pendientes</span>
+          </div>
+        </section>
+        <section className="panel stat-strip">
+          {statCards.map(([label, value]) => (
+            <div key={label as string}>
+              <span>{label}</span>
+              <strong>{String(value ?? 0)}</strong>
+            </div>
+          ))}
+        </section>
+        <div className="admin-chart-grid">
+          <BarChart title="Resumen operativo" data={summaryChartStats} note="Volumen general" />
+          <BarChart title="Estado de IA" data={aiPipelineStats} note="Procesados, fallback y pendientes" />
+          <BarChart title="Riesgo IA y validado" data={riskStats} note="Distribucion del riesgo" />
+          <BarChart title="Dominio emocional" data={emotionStats} note="Distribucion emocional" />
+          <BarChart title="Carga por dia" data={trendStats} note="Serie temporal" />
+          <BarChart title="Carga por grado" data={gradeStats} note="Distribucion por grado" />
+        </div>
       </section>
 
-      <BarChart title="Estado de IA" data={aiPipelineStats} note="Procesados, fallback y pendientes" />
-      <BarChart title="Riesgo IA y validado" data={riskStats} note="Distribucion del riesgo" />
-      <BarChart title="Dominio emocional" data={emotionStats} note="Distribucion emocional" />
-      <BarChart title="Carga por dia" data={trendStats} note="Serie temporal" />
-      <BarChart title="Carga por grado" data={gradeStats} note="Distribucion por grado" />
-
-      <section className="panel full-row">
+      <div className="admin-workbench">
+        <div className="admin-report-management">
+          <section className="panel admin-report-sidebar">
         <div className="section-head">
           <h2>Reportes anónimos</h2>
           <span>{adminReports.length} total</span>
@@ -1101,25 +1261,29 @@ function AdminPanel({
               key={report.id}
               onClick={() => openAdminReport(report.id)}
             >
-              <span className="report-row-main">
-                <strong>{report.public_code}</strong>
-                <small>
-                  {report.grade_reference ?? 'sin grado'} / {report.section_reference ?? 'sin sección'}
-                </small>
-                <small>
-                  {reportStatusLabel(report.status)} /{' '}
-                  {report.created_at ? new Date(report.created_at).toLocaleDateString('es-PE') : 'sin fecha'}
-                </small>
+              <span className="admin-report-line admin-report-line-top">
+                <span>
+                  <strong>{report.public_code}</strong>
+                  <small>
+                    {report.grade_reference ?? 'sin grado'} / {report.section_reference ?? 'sin sección'}
+                  </small>
+                </span>
+                <span className="admin-report-status">
+                  <strong className={`risk-chip ${riskTone(report.risk)}`}>{riskLabel(report.risk)}</strong>
+                  <small>
+                    {reportStatusLabel(report.status)} /{' '}
+                    {report.created_at ? new Date(report.created_at).toLocaleDateString('es-PE') : 'sin fecha'}
+                  </small>
+                </span>
+              </span>
+              <span className="admin-report-line admin-report-line-bottom">
                 <small className="admin-report-summary">{report.summary}</small>
-              </span>
-              <span className="ai-stack">
-                <strong className={`risk-chip ${riskTone(report.risk)}`}>{riskLabel(report.risk)}</strong>
-                <small>{report.dominant_emotion ?? 'emoción pendiente'}</small>
-              </span>
-              <span className="report-tags">
-                <span>{aiStateLabel(report)}</span>
-                <span>{report.ai_model_version ?? 'sin modelo'}</span>
-                <span>{report.ai_degraded ? 'con respaldo' : 'normal'}</span>
+                <span className="report-tags">
+                  <span>{report.dominant_emotion ?? 'emoción pendiente'}</span>
+                  <span>{aiStateLabel(report)}</span>
+                  <span>{report.ai_model_version ?? 'sin modelo'}</span>
+                  <span>{report.ai_degraded ? 'con respaldo' : 'normal'}</span>
+                </span>
               </span>
             </button>
           ))}
@@ -1127,7 +1291,7 @@ function AdminPanel({
         </div>
       </section>
 
-      <section className="panel full-row admin-detail-panel">
+      <section className="panel admin-detail-panel">
         <div className="section-head">
           <h2>Detalle del reporte</h2>
           <span>{adminDetailLoading ? 'Cargando...' : selectedAdminReport?.public_code ?? 'Sin selección'}</span>
@@ -1141,7 +1305,10 @@ function AdminPanel({
                 {riskLabel(selectedAdminReport.risk)}
               </strong>
             </div>
-            <p className="message-box">{selectedAdminReport.message_text}</p>
+            <div className="detail-section report-description-section">
+              <h3>Descripción del reporte</h3>
+              <p className="message-box">{selectedAdminReport.message_text}</p>
+            </div>
             <div className="detail-meta-grid">
               <div>
                 <span>Grado</span>
@@ -1287,53 +1454,127 @@ function AdminPanel({
         )}
       </section>
 
-      <form className="panel" onSubmit={createActivity}>
-        <h2>Actividad preventiva</h2>
-        <label>
-          Titulo
-          <input value={title} onChange={(event) => setTitle(event.target.value)} required />
-        </label>
-        <button>Registrar actividad</button>
-      </form>
-
-      <form className="panel" onSubmit={createUser}>
-        <h2>Crear perfil interno</h2>
-        <label>
-          Correo
-          <input value={userEmail} onChange={(event) => setUserEmail(event.target.value)} type="email" required />
-        </label>
-        <label>
-          Contraseña
-          <input value={userPassword} onChange={(event) => setUserPassword(event.target.value)} type="text" required />
-        </label>
-        <label>
-          Rol
-          <select value={userRole} onChange={(event) => setUserRole(event.target.value)}>
-            <option value="PSYCHOLOGIST">Psicólogo</option>
-            <option value="ADMIN_DIRECTOR">Administrador/Director</option>
-          </select>
-        </label>
-        <button>Crear usuario</button>
-        {createdCredential && (
-          <div className="error credential-box">
-            Perfil creado: <strong>{createdCredential.email}</strong> / <strong>{createdCredential.password}</strong>
-            <br />
-            Rol: {roleLabel(createdCredential.role)}
-          </div>
-        )}
-      </form>
-
-      <section className="panel">
-        <h2>Actividades</h2>
-        <div className="table-list">
-          {activities.map((activity) => (
-            <div className="list-row" key={activity.id}>
-              <span>{activity.title}</span>
-              <strong>{reportStatusLabel(activity.status)}</strong>
+          <section className="panel report-activity-panel">
+            <div className="section-head">
+              <h2>Actividad preventiva del reporte</h2>
+              <span>{selectedAdminReport?.public_code ?? 'Sin selección'}</span>
             </div>
-          ))}
+            <form className="inline-form" onSubmit={createActivity}>
+              <label>
+                Titulo
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Taller, seguimiento o intervención preventiva"
+                  required
+                />
+              </label>
+              <button disabled={!selectedAdminReport}>Registrar actividad</button>
+            </form>
+            <div className="table-list compact-list">
+              {selectedReportActivities.map((activity) => (
+                <div className="list-row" key={activity.id}>
+                  <span>
+                    <strong>{activity.title}</strong>
+                    <small>{new Date(activity.scheduled_date).toLocaleDateString('es-PE')}</small>
+                  </span>
+                  <strong>{reportStatusLabel(activity.status)}</strong>
+                </div>
+              ))}
+              {selectedAdminReport && selectedReportActivities.length === 0 && (
+                <p className="muted">No hay actividades preventivas vinculadas a este reporte.</p>
+              )}
+              {!selectedAdminReport && (
+                <p className="muted">Selecciona un reporte para crear o ver sus actividades preventivas.</p>
+              )}
+            </div>
+          </section>
         </div>
-      </section>
+
+        <aside className="admin-secondary-actions">
+          <section className="panel user-control-panel">
+            <div className="section-head">
+              <h2>Control de usuarios</h2>
+              {selectedUserId && (
+                <button type="button" className="ghost-button" onClick={resetUserForm}>
+                  Nuevo
+                </button>
+              )}
+            </div>
+            <p className="muted">{selectedUserId ? 'Actualiza el perfil seleccionado.' : 'Crea perfiles internos como acción secundaria.'}</p>
+            <form className="inline-form" onSubmit={saveUser}>
+              <label>
+                Nombre
+                <input value={userName} onChange={(event) => setUserName(event.target.value)} required />
+              </label>
+              <label>
+                Correo
+                <input value={userEmail} onChange={(event) => setUserEmail(event.target.value)} type="email" required />
+              </label>
+              {!selectedUserId && (
+                <label>
+                  Contraseña
+                  <input value={userPassword} onChange={(event) => setUserPassword(event.target.value)} type="text" required />
+                </label>
+              )}
+              <label>
+                Rol
+                <select value={userRole} onChange={(event) => setUserRole(event.target.value)}>
+                  <option value="PSYCHOLOGIST">Psicólogo</option>
+                  <option value="ADMIN_DIRECTOR">Administrador/Director</option>
+                </select>
+              </label>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={userActive}
+                  onChange={(event) => setUserActive(event.target.checked)}
+                />
+                Perfil activo
+              </label>
+              <button>{selectedUserId ? 'Actualizar usuario' : 'Crear usuario'}</button>
+              {createdCredential && (
+                <div className="error credential-box">
+                  Perfil creado: <strong>{createdCredential.email}</strong> / <strong>{createdCredential.password}</strong>
+                  <br />
+                  Rol: {roleLabel(createdCredential.role)}
+                </div>
+              )}
+            </form>
+          </section>
+
+          <section className="panel user-list-panel">
+            <div className="section-head">
+              <h2>Perfiles internos</h2>
+              <span>{users.length} total</span>
+            </div>
+            <div className="table-list compact-list">
+              {users.map((user) => (
+                <button
+                  type="button"
+                  className={`row-button user-row ${selectedUserId === user.id ? 'is-active' : ''}`}
+                  key={user.id}
+                  onClick={() => editUser(user)}
+                >
+                  <span className="user-identity">
+                    <span className="user-avatar">{user.name.trim().slice(0, 1).toUpperCase() || 'U'}</span>
+                    <span className="user-copy">
+                      <strong>{user.name}</strong>
+                      <small>{user.email}</small>
+                    </span>
+                  </span>
+                  <span className="user-meta">
+                    <strong>{roleLabel(user.role)}</strong>
+                    <small className={`status-pill ${user.active ? 'is-on' : 'is-off'}`}>
+                      {user.active ? 'Activo' : 'Inactivo'}
+                    </small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </aside>
+      </div>
     </main>
   );
 }

@@ -10,32 +10,6 @@ interface ApiResponse<T> {
   data: T;
 }
 
-async function waitForReports(
-  app: INestApplication<App>,
-  token: string,
-  expectedCount: number,
-  timeoutMs = 15000,
-) {
-  const startedAt = Date.now();
-  let latest: Array<{ id: string; risk_ai: string | null; priority_risk: string | null }> = [];
-
-  while (Date.now() - startedAt < timeoutMs) {
-    const response = await request(app.getHttpServer())
-      .get('/api/v1/psychologist/reports')
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200);
-
-    latest = (response.body as ApiResponse<typeof latest>).data;
-    if (latest.length >= expectedCount && latest.every((report) => report.risk_ai)) {
-      return latest;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-  }
-
-  throw new Error(`No se completo el analisis esperado de reportes: ${JSON.stringify(latest)}`);
-}
-
 describe('PMV alertas tempranas (e2e)', () => {
   let app: INestApplication<App>;
   const aiServiceUrlOriginal = process.env.AI_SERVICE_URL;
@@ -95,19 +69,35 @@ describe('PMV alertas tempranas (e2e)', () => {
       .post('/api/v1/auth/login')
       .send({ email: 'psicologo@agora.edu.pe', password: 'psicolog2024' })
       .expect(201);
-    const psychologistToken = (psychologistLogin.body as ApiResponse<{ accessToken: string }>).data.accessToken;
+    const psychologistToken = (
+      psychologistLogin.body as ApiResponse<{ accessToken: string }>
+    ).data.accessToken;
 
-    const reports = await waitForReports(app, psychologistToken, 2);
+    const reportsResponse = await request(app.getHttpServer())
+      .get('/api/v1/psychologist/reports')
+      .set('Authorization', `Bearer ${psychologistToken}`)
+      .expect(200);
+
+    const reports = (
+      reportsResponse.body as ApiResponse<
+        Array<{ id: string; risk_ai: string | null; priority_risk: string | null }>
+      >
+    ).data;
     expect(reports).toHaveLength(2);
-    expect(reports[0].priority_risk).toBe('MEDIUM');
-    expect(reports.every((report) => report.risk_ai !== null)).toBe(true);
-    expect(reports.every((report) => report.priority_risk !== null)).toBe(true);
+    expect(reports.every((report) => report.risk_ai === null)).toBe(true);
+    expect(reports.every((report) => report.priority_risk === null)).toBe(true);
 
     const detailResponse = await request(app.getHttpServer())
       .get(`/api/v1/psychologist/reports/${reports[0].id}`)
       .set('Authorization', `Bearer ${psychologistToken}`)
       .expect(200);
-    expect((detailResponse.body as ApiResponse<{ ai_analysis: { risk_ai: string; model_version: string } }>).data.ai_analysis).toMatchObject({
+    expect(
+      (
+        detailResponse.body as ApiResponse<{
+          ai_analysis: { risk_ai: string; model_version: string };
+        }>
+      ).data.ai_analysis,
+    ).toMatchObject({
       risk_ai: 'MEDIUM',
       model_version: 'typescript-safety-fallback',
     });
@@ -132,7 +122,9 @@ describe('PMV alertas tempranas (e2e)', () => {
       .post('/api/v1/auth/login')
       .send({ email: 'admin@agora.edu.pe', password: 'admin2024' })
       .expect(201);
-    const adminToken = (adminLogin.body as ApiResponse<{ accessToken: string }>).data.accessToken;
+    const adminToken = (
+      adminLogin.body as ApiResponse<{ accessToken: string }>
+    ).data.accessToken;
 
     const createdEmail = `usuario-${Date.now()}@agora.edu.pe`;
     const createdPassword = 'Temporal123*';
@@ -146,7 +138,14 @@ describe('PMV alertas tempranas (e2e)', () => {
         role: 'PSYCHOLOGIST',
       })
       .expect(201);
-    expect((createdUserResponse.body as ApiResponse<{ email: string; role: string }>).data).toMatchObject({
+    expect(
+      (
+        createdUserResponse.body as ApiResponse<{
+          email: string;
+          role: string;
+        }>
+      ).data,
+    ).toMatchObject({
       email: createdEmail,
       role: 'PSYCHOLOGIST',
     });
@@ -160,17 +159,40 @@ describe('PMV alertas tempranas (e2e)', () => {
       .get('/api/v1/dashboard/summary')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
-    expect((summaryResponse.body as ApiResponse<{ reports_received: number; alerts_generated: number }>).data).toMatchObject({
+    expect(
+      (
+        summaryResponse.body as ApiResponse<{
+          reports_received: number;
+          alerts_generated: number;
+          ai_classified_reports: number;
+          ai_pending_reports: number;
+        }>
+      ).data,
+    ).toMatchObject({
       reports_received: 2,
-      alerts_generated: 2,
+      alerts_generated: 1,
+      ai_classified_reports: 1,
+      ai_pending_reports: 1,
     });
 
     const adminReportsResponse = await request(app.getHttpServer())
       .get('/api/v1/dashboard/reports')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
-    expect((adminReportsResponse.body as ApiResponse<Array<{ ai_degraded: boolean; summary: string }>>).data).toHaveLength(2);
-    expect((adminReportsResponse.body as ApiResponse<Array<{ ai_degraded: boolean; summary: string }>>).data.every((report) => report.ai_degraded)).toBe(true);
+    const adminReports = (
+      adminReportsResponse.body as ApiResponse<
+        Array<{ id: string; ai_degraded: boolean; risk: string | null; summary: string }>
+      >
+    ).data;
+    expect(adminReports).toHaveLength(2);
+    expect(adminReports.find((report) => report.id === reports[0].id)).toMatchObject({
+      ai_degraded: true,
+      risk: 'HIGH',
+    });
+    expect(adminReports.find((report) => report.id === reports[1].id)).toMatchObject({
+      ai_degraded: false,
+      risk: null,
+    });
 
     const adminReportDetailResponse = await request(app.getHttpServer())
       .get(`/api/v1/dashboard/reports/${reports[0].id}`)

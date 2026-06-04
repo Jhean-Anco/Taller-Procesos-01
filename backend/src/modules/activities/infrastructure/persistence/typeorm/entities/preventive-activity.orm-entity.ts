@@ -6,6 +6,9 @@ export class PreventiveActivityOrmEntity {
   @PrimaryColumn('varchar', { length: 64 })
   id!: string;
 
+  @Column('varchar', { name: 'report_id', length: 64, nullable: true })
+  reportId?: string | null;
+
   @Column('varchar', { length: 180 })
   title!: string;
 

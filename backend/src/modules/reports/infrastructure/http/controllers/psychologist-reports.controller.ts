@@ -5,6 +5,7 @@ import { ProtegerRuta } from '../../../../../shared/infrastructure/auth/proteger
 import { UsuarioAutenticado } from '../../../../../shared/infrastructure/auth/usuario-autenticado.interface';
 import {
   DeriveReportDto,
+  ProcessAnalysisQueueDto,
   ReportFiltersDto,
   ReviewReportDto,
   UpdateReportStatusDto,
@@ -27,6 +28,17 @@ export class PsychologistReportsController {
       dateFrom: filters.date_from ? new Date(filters.date_from) : undefined,
       dateTo: filters.date_to ? new Date(filters.date_to) : undefined,
     });
+  }
+
+  @Post('analysis/process-pending')
+  processPendingAnalysis(
+    @Body() dto: ProcessAnalysisQueueDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.reportsUseCases.processPendingAnalyses(
+      dto.limit ?? 10,
+      this.actor(request),
+    );
   }
 
   @Get(':id')

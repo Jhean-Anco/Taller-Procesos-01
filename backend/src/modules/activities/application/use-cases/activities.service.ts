@@ -25,6 +25,7 @@ export class ActivitiesService {
     const activity = await this.activitiesRepository.create(
       new PreventiveActivity({
         id: generarIdSeguro('act'),
+        reportId: dto.report_id ?? null,
         title: dto.title,
         description: dto.description,
         objective: dto.objective,
@@ -57,6 +58,7 @@ export class ActivitiesService {
     const activity = await this.get(id);
     const updates: Parameters<PreventiveActivity['update']>[0] = {};
     if (dto.title !== undefined) updates.title = dto.title;
+    if (dto.report_id !== undefined) updates.reportId = dto.report_id;
     if (dto.description !== undefined) updates.description = dto.description;
     if (dto.objective !== undefined) updates.objective = dto.objective;
     if (dto.activity_type !== undefined) updates.activityType = dto.activity_type;
@@ -107,6 +109,7 @@ export class ActivitiesService {
   private present(activity: PreventiveActivity) {
     return {
       id: activity.id,
+      report_id: activity.reportId ?? null,
       title: activity.title,
       description: activity.description,
       objective: activity.objective,

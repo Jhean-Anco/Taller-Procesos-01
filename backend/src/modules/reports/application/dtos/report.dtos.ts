@@ -2,10 +2,13 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { ReportStatus, RiskLevel } from '../../../shared/domain/enums';
@@ -84,4 +87,12 @@ export class DeriveReportDto {
   @IsOptional()
   @IsString()
   admin_director_id?: string;
+}
+
+export class ProcessAnalysisQueueDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
 }

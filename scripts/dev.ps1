@@ -4,6 +4,28 @@ $raiz = Split-Path -Parent $PSScriptRoot
 $runtime = Join-Path $raiz '.runtime'
 New-Item -ItemType Directory -Force -Path $runtime | Out-Null
 
+function Set-DefaultEnv {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string] $Name,
+    [Parameter(Mandatory = $true)]
+    [string] $Value
+  )
+
+  if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($Name, 'Process'))) {
+    [Environment]::SetEnvironmentVariable($Name, $Value, 'Process')
+  }
+}
+
+Set-DefaultEnv -Name 'DATABASE_ENABLED' -Value 'true'
+Set-DefaultEnv -Name 'DATABASE_HOST' -Value 'localhost'
+Set-DefaultEnv -Name 'DATABASE_PORT' -Value '5432'
+Set-DefaultEnv -Name 'DATABASE_USERNAME' -Value 'postgres'
+Set-DefaultEnv -Name 'DATABASE_PASSWORD' -Value 'postgres'
+Set-DefaultEnv -Name 'DATABASE_NAME' -Value 'safeschool_ai'
+Set-DefaultEnv -Name 'DATABASE_SYNC' -Value 'false'
+Set-DefaultEnv -Name 'DATABASE_SSL' -Value 'false'
+
 function Test-Port {
   param(
     [Parameter(Mandatory = $true)]

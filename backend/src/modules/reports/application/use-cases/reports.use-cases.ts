@@ -204,24 +204,93 @@ export class ReportsUseCases {
     return this.presenter.adminDetailedReport(aggregate);
   }
 
+  async processPendingAnalyses(limit = 10, actor?: InternalActor) {
+    const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
+    const jobs = await this.reportsRepository.claimPendingAnalysisJobs(safeLimit);
+    const results = [];
+
+    for (const report of jobs) {
+      const aggregate = await this.reportsRepository.findById(report.id);
+      if (aggregate?.analysis) {
+        await this.reportsRepository.saveReport(report.completeAnalysis());
+        results.push({
+          report_id: report.id,
+          public_code: report.publicCode,
+          status: 'COMPLETED',
+          risk_ai: aggregate.analysis.riskAi,
+          persisted: true,
+        });
+        continue;
+      }
+
+      const outcome = await this.analyzeAndPersist(report);
+      results.push({
+        report_id: report.id,
+        public_code: report.publicCode,
+        status: outcome.status,
+        risk_ai: outcome.analysis?.riskAi ?? null,
+        persisted: Boolean(outcome.analysis),
+        error: outcome.error ?? null,
+      });
+    }
+
+    if (actor) {
+      await this.auditService.register({
+        actorUserId: actor.id,
+        action: 'PROCESS_PENDING_AI_ANALYSIS',
+        entityType: 'anonymous_report',
+        entityId: 'analysis_queue',
+        metadata: {
+          requested_limit: safeLimit,
+          claimed: jobs.length,
+          completed: results.filter((item) => item.status === 'COMPLETED').length,
+        },
+        ip: actor.ip,
+      });
+    }
+
+    return {
+      requested_limit: safeLimit,
+      claimed: jobs.length,
+      completed: results.filter((item) => item.status === 'COMPLETED').length,
+      pending_or_failed: results.filter((item) => item.status !== 'COMPLETED').length,
+      results,
+    };
+  }
+
   private async ensureAnalysisIfNeeded(aggregate: ReportAggregate): Promise<ReportAggregate> {
     if (aggregate.analysis || (aggregate.report.analysisQueueStatus ?? 'PENDING') === 'COMPLETED') {
       return aggregate;
     }
 
-    const started = aggregate.report.startAnalysis();
-    await this.reportsRepository.saveReport(started);
+    const started =
+      aggregate.report.analysisQueueStatus === 'PROCESSING'
+        ? aggregate.report
+        : aggregate.report.startAnalysis();
 
+    if (aggregate.report.analysisQueueStatus !== 'PROCESSING') {
+      await this.reportsRepository.saveReport(started);
+    }
+
+    await this.analyzeAndPersist(started);
+    return (await this.reportsRepository.findById(aggregate.report.id)) ?? aggregate;
+  }
+
+  private async analyzeAndPersist(report: AnonymousReport): Promise<{
+    status: 'COMPLETED' | 'PENDING' | 'FAILED';
+    analysis?: AiAnalysis;
+    error?: string;
+  }> {
     try {
       const analysisResult = await this.aiAnalyzer.analyze({
-        message: aggregate.report.messageText,
-        emotionalForm: aggregate.report.emotionalForm,
+        message: report.messageText,
+        emotionalForm: report.emotionalForm,
       });
 
       const analysis = await this.reportsRepository.saveAnalysis(
         new AiAnalysis({
           id: generarIdSeguro('ana'),
-          reportId: aggregate.report.id,
+          reportId: report.id,
           dominantEmotion: analysisResult.dominantEmotion,
           emotionScores: analysisResult.emotionScores,
           riskAi: analysisResult.riskAi,
@@ -232,15 +301,20 @@ export class ReportsUseCases {
         }),
       );
 
-      await this.alertsService.ensureForRisk(aggregate.report.id, analysis.riskAi, AlertGeneratedBy.AI);
-      await this.reportsRepository.saveReport(started.completeAnalysis());
+      await this.alertsService.ensureForRisk(report.id, analysis.riskAi, AlertGeneratedBy.AI);
+      await this.reportsRepository.saveReport(report.completeAnalysis());
+      return { status: 'COMPLETED', analysis };
     } catch (error) {
-      await this.reportsRepository.saveReport(
-        started.scheduleAnalysisRetry(error instanceof Error ? error.message : 'Fallo desconocido en IA', null),
+      const message =
+        error instanceof Error ? error.message : 'Fallo desconocido en IA';
+      const saved = await this.reportsRepository.saveReport(
+        report.scheduleAnalysisRetry(message, null),
       );
+      return {
+        status: saved.analysisQueueStatus === 'FAILED' ? 'FAILED' : 'PENDING',
+        error: message,
+      };
     }
-
-    return (await this.reportsRepository.findById(aggregate.report.id)) ?? aggregate;
   }
 
   private async getAggregate(id: string) {

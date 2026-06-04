@@ -2,6 +2,11 @@ import { IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-val
 import { PreventiveActivityStatus } from '../../../shared/domain/enums';
 
 export class CreatePreventiveActivityDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  report_id?: string;
+
   @IsString()
   @MaxLength(180)
   title!: string;
@@ -27,6 +32,11 @@ export class CreatePreventiveActivityDto {
 }
 
 export class UpdatePreventiveActivityDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  report_id?: string | null;
+
   @IsOptional()
   @IsString()
   title?: string;

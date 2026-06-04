@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS derivations (
 
 CREATE TABLE IF NOT EXISTS preventive_activities (
   id VARCHAR(64) PRIMARY KEY,
+  report_id VARCHAR(64) REFERENCES anonymous_reports(id) ON DELETE SET NULL,
   title VARCHAR(180) NOT NULL,
   description TEXT NOT NULL,
   objective TEXT NOT NULL,
@@ -127,6 +128,22 @@ CREATE TABLE IF NOT EXISTS preventive_activities (
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
+ALTER TABLE preventive_activities
+  ADD COLUMN IF NOT EXISTS report_id VARCHAR(64);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_preventive_activities_report'
+  ) THEN
+    ALTER TABLE preventive_activities
+      ADD CONSTRAINT fk_preventive_activities_report
+      FOREIGN KEY (report_id) REFERENCES anonymous_reports(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS audit_logs (
   id VARCHAR(64) PRIMARY KEY,
   actor_user_id VARCHAR(64),
@@ -137,3 +154,212 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   ip VARCHAR(80),
   created_at TIMESTAMP NOT NULL DEFAULT now()
 );
+
+CREATE OR REPLACE PROCEDURE sp_limpiar_carga_reportes_masivos()
+LANGUAGE sql
+AS $$
+  DELETE FROM anonymous_reports WHERE id LIKE 'rep_massivo_%';
+$$;
+
+CREATE OR REPLACE FUNCTION sp_dashboard_resumen()
+RETURNS TABLE (
+  reports_received INTEGER,
+  alerts_generated INTEGER,
+  cases_addressed INTEGER,
+  preventive_activities INTEGER,
+  ai_classified_reports INTEGER,
+  ai_degraded_reports INTEGER,
+  ai_pending_reports INTEGER
+)
+LANGUAGE sql
+AS $$
+  SELECT
+    (SELECT COUNT(*)::int FROM anonymous_reports) AS reports_received,
+    (SELECT COUNT(*)::int FROM alerts) AS alerts_generated,
+    (SELECT COUNT(*)::int FROM anonymous_reports WHERE status = 'ADDRESSED') AS cases_addressed,
+    (SELECT COUNT(*)::int FROM preventive_activities) AS preventive_activities,
+    (SELECT COUNT(DISTINCT report_id)::int FROM ai_analyses) AS ai_classified_reports,
+    (
+      SELECT COUNT(DISTINCT report_id)::int
+      FROM ai_analyses
+      WHERE relevant_signals ? 'ai_service_unavailable_local_fallback'
+    ) AS ai_degraded_reports,
+    (
+      SELECT COUNT(*)::int
+      FROM anonymous_reports report
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM ai_analyses analysis
+        WHERE analysis.report_id = report.id
+      )
+    ) AS ai_pending_reports;
+$$;
+
+CREATE OR REPLACE FUNCTION sp_dashboard_estadisticas_riesgo(min_group_size INTEGER DEFAULT 3)
+RETURNS TABLE (metric_label TEXT, metric_value TEXT)
+LANGUAGE sql
+AS $$
+  WITH latest_analysis AS (
+    SELECT DISTINCT ON (report_id) report_id, risk_ai
+    FROM ai_analyses
+    ORDER BY report_id, created_at DESC
+  ),
+  latest_review AS (
+    SELECT DISTINCT ON (report_id) report_id, validated_risk
+    FROM psychological_reviews
+    ORDER BY report_id, reviewed_at DESC
+  ),
+  counts AS (
+    SELECT
+      COALESCE(
+        CASE COALESCE(latest_review.validated_risk, latest_analysis.risk_ai)
+          WHEN 'LOW' THEN 'Bajo'
+          WHEN 'MEDIUM' THEN 'Moderado'
+          WHEN 'HIGH' THEN 'Alto'
+        END,
+        'Sin clasificar'
+      ) AS label,
+      COUNT(*)::int AS total
+    FROM anonymous_reports report
+    LEFT JOIN latest_analysis ON latest_analysis.report_id = report.id
+    LEFT JOIN latest_review ON latest_review.report_id = report.id
+    GROUP BY 1
+  )
+  SELECT
+    label AS metric_label,
+    CASE
+      WHEN total < min_group_size THEN 'datos insuficientes para proteger anonimato'
+      ELSE total::text
+    END AS metric_value
+  FROM counts
+  ORDER BY label;
+$$;
+
+CREATE OR REPLACE FUNCTION sp_dashboard_estadisticas_emocion(min_group_size INTEGER DEFAULT 3)
+RETURNS TABLE (metric_label TEXT, metric_value TEXT)
+LANGUAGE sql
+AS $$
+  WITH latest_analysis AS (
+    SELECT DISTINCT ON (report_id) report_id, dominant_emotion
+    FROM ai_analyses
+    ORDER BY report_id, created_at DESC
+  ),
+  counts AS (
+    SELECT
+      COALESCE(
+        CASE latest_analysis.dominant_emotion
+          WHEN 'fear' THEN 'miedo'
+          WHEN 'sadness' THEN 'tristeza'
+          WHEN 'anxiety' THEN 'ansiedad'
+          WHEN 'anger' THEN 'enojo'
+          WHEN 'uncertain' THEN 'indeterminado'
+          WHEN 'joy' THEN 'alegria'
+          WHEN 'neutral' THEN 'neutral'
+          WHEN 'isolation' THEN 'aislamiento'
+          WHEN 'school_insecurity' THEN 'inseguridad escolar'
+          ELSE REPLACE(latest_analysis.dominant_emotion, '_', ' ')
+        END,
+        'Sin clasificar'
+      ) AS label,
+      COUNT(*)::int AS total
+    FROM anonymous_reports report
+    LEFT JOIN latest_analysis ON latest_analysis.report_id = report.id
+    GROUP BY 1
+  )
+  SELECT
+    label AS metric_label,
+    CASE
+      WHEN total < min_group_size THEN 'datos insuficientes para proteger anonimato'
+      ELSE total::text
+    END AS metric_value
+  FROM counts
+  ORDER BY label;
+$$;
+
+CREATE OR REPLACE FUNCTION sp_dashboard_tendencia_reportes(min_group_size INTEGER DEFAULT 3)
+RETURNS TABLE (metric_label TEXT, metric_value TEXT)
+LANGUAGE sql
+AS $$
+  WITH counts AS (
+    SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS label, COUNT(*)::int AS total
+    FROM anonymous_reports
+    GROUP BY 1
+  )
+  SELECT
+    label AS metric_label,
+    CASE
+      WHEN total < min_group_size THEN 'datos insuficientes para proteger anonimato'
+      ELSE total::text
+    END AS metric_value
+  FROM counts
+  ORDER BY label;
+$$;
+
+CREATE OR REPLACE FUNCTION sp_dashboard_estadisticas_grado(min_group_size INTEGER DEFAULT 3)
+RETURNS TABLE (metric_label TEXT, metric_value TEXT)
+LANGUAGE sql
+AS $$
+  WITH counts AS (
+    SELECT COALESCE(NULLIF(grade_reference, ''), 'SIN_DATO') AS label, COUNT(*)::int AS total
+    FROM anonymous_reports
+    GROUP BY 1
+  )
+  SELECT
+    label AS metric_label,
+    CASE
+      WHEN total < min_group_size THEN 'datos insuficientes para proteger anonimato'
+      ELSE total::text
+    END AS metric_value
+  FROM counts
+  ORDER BY label;
+$$;
+
+CREATE OR REPLACE FUNCTION sp_validar_carga_reportes_masivos(expected_total INTEGER DEFAULT NULL)
+RETURNS TABLE (
+  total_masivos INTEGER,
+  total_visibles_psicologo INTEGER,
+  analisis_masivos INTEGER,
+  pendientes_ia INTEGER,
+  carga_exitosa BOOLEAN,
+  observacion TEXT
+)
+LANGUAGE sql
+AS $$
+  WITH counts AS (
+    SELECT
+      (SELECT COUNT(*)::int FROM anonymous_reports WHERE id LIKE 'rep_massivo_%') AS total_masivos,
+      (
+        SELECT COUNT(*)::int
+        FROM anonymous_reports
+        WHERE id LIKE 'rep_massivo_%'
+          AND status IN ('PENDING', 'IN_REVIEW', 'ADDRESSED', 'CLOSED')
+      ) AS total_visibles_psicologo,
+      (SELECT COUNT(*)::int FROM ai_analyses WHERE report_id LIKE 'rep_massivo_%') AS analisis_masivos,
+      (
+        SELECT COUNT(*)::int
+        FROM anonymous_reports
+        WHERE id LIKE 'rep_massivo_%'
+          AND analysis_queue_status = 'PENDING'
+      ) AS pendientes_ia
+  )
+  SELECT
+    total_masivos,
+    total_visibles_psicologo,
+    analisis_masivos,
+    pendientes_ia,
+    (
+      (expected_total IS NULL OR total_masivos = expected_total)
+      AND total_visibles_psicologo = total_masivos
+      AND analisis_masivos = 0
+    ) AS carga_exitosa,
+    CASE
+      WHEN expected_total IS NOT NULL AND total_masivos <> expected_total
+        THEN 'No coincide el total esperado de reportes masivos'
+      WHEN total_visibles_psicologo <> total_masivos
+        THEN 'Hay reportes masivos que no quedan visibles para psicologia'
+      WHEN analisis_masivos <> 0
+        THEN 'La carga masiva genero analisis IA aunque debe quedar pendiente'
+      ELSE 'Carga masiva validada para el modulo de psicologia'
+    END AS observacion
+  FROM counts;
+$$;

@@ -2,6 +2,7 @@ import { PreventiveActivityStatus } from '../../../shared/domain/enums';
 
 export interface PreventiveActivityProps {
   id: string;
+  reportId?: string | null;
   title: string;
   description: string;
   objective: string;
@@ -23,6 +24,10 @@ export class PreventiveActivity {
 
   get title(): string {
     return this.props.title;
+  }
+
+  get reportId(): string | null | undefined {
+    return this.props.reportId;
   }
 
   get description(): string {
