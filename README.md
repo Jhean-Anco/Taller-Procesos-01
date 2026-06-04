@@ -97,12 +97,12 @@ Variables opcionales:
 $env:CARGA_TOTAL='1000'
 ```
 
-El script inserta los reportes directo en PostgreSQL, retira cargas masivas previas y no crea registros en `ai_analyses`.
-Al finalizar ejecuta `sp_validar_carga_reportes_masivos` y debe mostrar los reportes visibles para psicologia.
-
-La IA se calcula cuando el usuario abre el detalle de un reporte en psicologia o administracion. Hasta ese momento el reporte queda como dato crudo.
+El script inserta los reportes directo en PostgreSQL, retira cargas masivas previas y deja la IA pendiente. La carga incluye textos, grados, secciones, rangos de edad, formularios emocionales, fechas y estados variados en orden mezclado para evidenciar que la IA responde distinto al abrir cada detalle.
+Al finalizar ejecuta `sp_validar_carga_reportes_masivos` y debe mostrar los reportes visibles para psicologia, sin analisis IA precalculados y pendientes de procesamiento.
 
 Al levantar `npm run dev`, el entorno usa PostgreSQL por defecto, vacia los datos de la base de datos y conserva las tablas. Ejecuta `npm run seed:carga-masiva` despues de iniciar el entorno si quieres ver los 1000 datos de prueba en la aplicacion.
+
+La IA se calcula cuando el usuario abre el detalle de un reporte en psicologia o administracion. Hasta ese momento el reporte queda como dato crudo.
 
 Si el psicologo no ve reportes, reinicia el backend con `npm run dev:stop` y `npm run dev`, valida que `backend/.env` y `frontend/.env` apunten a la misma API/base de datos (`DATABASE_NAME=safeschool_ai` y `VITE_API_URL=http://localhost:3000/api/v1`) y vuelve a ejecutar la carga despues de iniciar el entorno.
 
@@ -122,7 +122,7 @@ La migracion `backend/migrations/001_pmv_alertas_tempranas.sql` consigna procedi
 - Usuarios: `POST /api/v1/users`, `GET /api/v1/users`, `PATCH /api/v1/users/:id`, `PATCH /api/v1/users/:id/status`
 - Psicologo: `GET /api/v1/psychologist/reports`, `GET /api/v1/psychologist/reports/:id`, `POST /api/v1/psychologist/reports/:id/review`, `PATCH /api/v1/psychologist/reports/:id/status`, `POST /api/v1/psychologist/reports/:id/derive`
 - Alertas: `GET /api/v1/alerts`, `GET /api/v1/alerts/:id`, `PATCH /api/v1/alerts/:id/status`
-- Admin/director: `GET /api/v1/dashboard/summary`, `GET /api/v1/dashboard/risk-statistics`, `GET /api/v1/dashboard/emotion-statistics`, `GET /api/v1/dashboard/alerts-statistics`, `GET /api/v1/dashboard/anonymous-reports-trends`, `POST /api/v1/preventive-activities`, `GET /api/v1/preventive-activities`, `PATCH /api/v1/preventive-activities/:id`, `PATCH /api/v1/preventive-activities/:id/status`, `GET /api/v1/audit-logs`
+- Admin/director: `GET /api/v1/dashboard/summary`, `GET /api/v1/dashboard/risk-statistics`, `GET /api/v1/dashboard/emotion-statistics`, `GET /api/v1/dashboard/alerts-statistics`, `POST /api/v1/preventive-activities`, `GET /api/v1/preventive-activities`, `PATCH /api/v1/preventive-activities/:id`, `PATCH /api/v1/preventive-activities/:id/status`, `GET /api/v1/audit-logs`
 
 ## Pruebas
 

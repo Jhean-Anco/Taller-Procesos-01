@@ -351,6 +351,7 @@ AS $$
       (expected_total IS NULL OR total_masivos = expected_total)
       AND total_visibles_psicologo = total_masivos
       AND analisis_masivos = 0
+      AND pendientes_ia = total_masivos
     ) AS carga_exitosa,
     CASE
       WHEN expected_total IS NOT NULL AND total_masivos <> expected_total
@@ -359,7 +360,9 @@ AS $$
         THEN 'Hay reportes masivos que no quedan visibles para psicologia'
       WHEN analisis_masivos <> 0
         THEN 'La carga masiva genero analisis IA aunque debe quedar pendiente'
-      ELSE 'Carga masiva validada para el modulo de psicologia'
+      WHEN pendientes_ia <> total_masivos
+        THEN 'Hay reportes masivos que no quedaron pendientes de IA'
+      ELSE 'Carga masiva validada como datos crudos para procesar IA bajo demanda'
     END AS observacion
   FROM counts;
 $$;

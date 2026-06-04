@@ -35,6 +35,9 @@ interface AiAnalysisDetail {
   risk_ai: string;
   confidence?: number | null;
   relevant_signals: string[];
+  explanation?: string | null;
+  recommended_action?: string | null;
+  context_summary?: string | null;
   note: string;
   model_version?: string | null;
 }
@@ -238,6 +241,10 @@ function buildActionHint(level?: string | null) {
 }
 
 function explainAiDecision(analysis: AiAnalysisDetail) {
+  if (analysis.explanation?.trim()) {
+    return analysis.explanation.trim();
+  }
+
   const risk = normalizeRisk(analysis.risk_ai);
   const topEmotion = sortMetricEntries(analysis.emotion_scores)[0];
   const emotionText = topEmotion
@@ -703,11 +710,9 @@ function PsychologistPanel({
       setReports(reportsData);
 
       const currentStillExists = detail ? reportsData.some((report) => report.id === detail.id) : false;
-      const target = currentStillExists ? detail?.id : reportsData[0]?.id;
-      if (target) {
-        await open(target);
-      } else {
+      if (!currentStillExists) {
         setDetail(null);
+        setRisk('LOW');
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudieron cargar los reportes.');
@@ -997,12 +1002,15 @@ function PsychologistPanel({
                 <>
                   <div className={`ai-summary ${riskTone(detailAnalysis.risk_ai)}`}>
                     <p className="ai-summary-title">La IA ve este caso como {riskLabel(detailAnalysis.risk_ai).toLowerCase()}.</p>
-                    <p className="ai-summary-body">{describeRiskNarrative(detailAnalysis.risk_ai, detailAnalysis.dominant_emotion)}</p>
+                    <p className="ai-summary-body">
+                      {detailAnalysis.context_summary ??
+                        describeRiskNarrative(detailAnalysis.risk_ai, detailAnalysis.dominant_emotion)}
+                    </p>
                     <p className="ai-decision">{explainAiDecision(detailAnalysis)}</p>
                     <div className="ai-summary-meta">
                       <span>Emocion dominante: {detailAnalysis.dominant_emotion}</span>
                       <span>Confianza: {confidenceLabel(detailAnalysis.confidence)}</span>
-                      <span>Accion sugerida: {buildActionHint(detailAnalysis.risk_ai)}</span>
+                      <span>Accion sugerida: {detailAnalysis.recommended_action ?? buildActionHint(detailAnalysis.risk_ai)}</span>
                     </div>
                   </div>
                   <div className="signal-list">
@@ -1066,9 +1074,6 @@ function AdminPanel({
   notify: (message: string, kind?: ToastKind) => void;
 }) {
   const [summary, setSummary] = useState<Record<string, unknown>>({});
-  const [riskStats, setRiskStats] = useState<MetricMap>({});
-  const [emotionStats, setEmotionStats] = useState<MetricMap>({});
-  const [trendStats, setTrendStats] = useState<MetricMap>({});
   const [gradeStats, setGradeStats] = useState<MetricMap>({});
   const [activities, setActivities] = useState<PreventiveActivityItem[]>([]);
   const [users, setUsers] = useState<InternalUserItem[]>([]);
@@ -1094,32 +1099,23 @@ function AdminPanel({
   const load = useCallback(async () => {
     setError('');
     try {
-      const [summaryData, riskData, emotionData, trendData, gradeData, activityData, reportsData, usersData] = await Promise.all([
+      const [summaryData, gradeData, activityData, reportsData, usersData] = await Promise.all([
         api<Record<string, unknown>>('/dashboard/summary', token),
-        api<MetricMap>('/dashboard/risk-statistics', token),
-        api<MetricMap>('/dashboard/emotion-statistics', token),
-        api<MetricMap>('/dashboard/anonymous-reports-trends', token),
         api<MetricMap>('/dashboard/grade-statistics', token),
         api<PreventiveActivityItem[]>('/preventive-activities', token),
         api<AdminReportItem[]>('/dashboard/reports', token),
         api<InternalUserItem[]>('/users', token),
       ]);
       setSummary(summaryData);
-      setRiskStats(riskData);
-      setEmotionStats(emotionData);
-      setTrendStats(trendData);
       setGradeStats(gradeData);
       setActivities(activityData);
       setAdminReports(reportsData);
       setUsers(usersData);
-      const nextId =
-        (selectedAdminReportId && reportsData.some((report) => report.id === selectedAdminReportId)
-          ? selectedAdminReportId
-          : reportsData[0]?.id) ?? null;
-      setSelectedAdminReportId(nextId);
-      if (nextId) {
-        await openAdminReport(nextId);
-      } else {
+      const currentStillExists = selectedAdminReportId
+        ? reportsData.some((report) => report.id === selectedAdminReportId)
+        : false;
+      if (!currentStillExists) {
+        setSelectedAdminReportId(null);
         setSelectedAdminReport(null);
       }
     } catch (caught) {
@@ -1367,9 +1363,6 @@ function AdminPanel({
         <div className="admin-chart-grid">
           <BarChart title="Resumen operativo" data={summaryChartStats} note="Volumen general" />
           <BarChart title="Estado de IA" data={aiPipelineStats} note="Procesados, fallback y pendientes" />
-          <BarChart title="Riesgo IA y validado" data={riskStats} note="Distribucion del riesgo" />
-          <BarChart title="Dominio emocional" data={emotionStats} note="Distribucion emocional" />
-          <BarChart title="Carga por dia" data={trendStats} note="Serie temporal" />
           <BarChart title="Carga por grado" data={gradeStats} note="Distribucion por grado" />
         </div>
       </section>
@@ -1448,7 +1441,6 @@ function AdminPanel({
                 <span className="report-tags">
                   <span>{report.dominant_emotion ?? 'emoción pendiente'}</span>
                   <span>{aiStateLabel(report)}</span>
-                  <span>{report.ai_model_version ?? 'sin modelo'}</span>
                   <span>{report.ai_degraded ? 'con respaldo' : 'normal'}</span>
                 </span>
               </span>
@@ -1527,16 +1519,21 @@ function AdminPanel({
                       La IA ve este caso como {riskLabel(selectedAdminReport.ai_analysis.risk_ai).toLowerCase()}.
                     </p>
                     <p className="ai-summary-body">
-                      {describeRiskNarrative(
-                        selectedAdminReport.ai_analysis.risk_ai,
-                        selectedAdminReport.ai_analysis.dominant_emotion,
-                      )}
+                      {selectedAdminReport.ai_analysis.context_summary ??
+                        describeRiskNarrative(
+                          selectedAdminReport.ai_analysis.risk_ai,
+                          selectedAdminReport.ai_analysis.dominant_emotion,
+                        )}
                     </p>
                     <p className="ai-decision">{explainAiDecision(selectedAdminReport.ai_analysis)}</p>
                     <div className="ai-summary-meta">
                       <span>Emoción dominante: {selectedAdminReport.ai_analysis.dominant_emotion}</span>
                       <span>Confianza: {confidenceLabel(selectedAdminReport.ai_analysis.confidence)}</span>
-                      <span>Modelo: {selectedAdminReport.ai_analysis.model_version ?? 'sin modelo'}</span>
+                      <span>
+                        Accion sugerida:{' '}
+                        {selectedAdminReport.ai_analysis.recommended_action ??
+                          buildActionHint(selectedAdminReport.ai_analysis.risk_ai)}
+                      </span>
                     </div>
                   </div>
                   <div className="emotion-grid">

@@ -29,6 +29,33 @@ export class ReportPresenter {
     return labels[signal] ?? signal.replace(/_/g, ' ');
   }
 
+  private extractAiMetadata(signals: string[]) {
+    const metadata = {
+      explanation: null as string | null,
+      recommendedAction: null as string | null,
+      contextSummary: null as string | null,
+      visibleSignals: [] as string[],
+    };
+
+    for (const signal of signals) {
+      if (signal.startsWith('explicacion::')) {
+        metadata.explanation = signal.slice('explicacion::'.length).trim() || null;
+        continue;
+      }
+      if (signal.startsWith('accion::')) {
+        metadata.recommendedAction = signal.slice('accion::'.length).trim() || null;
+        continue;
+      }
+      if (signal.startsWith('resumen::')) {
+        metadata.contextSummary = signal.slice('resumen::'.length).trim() || null;
+        continue;
+      }
+      metadata.visibleSignals.push(signal);
+    }
+
+    return metadata;
+  }
+
   private translateEmotionScores(scores: Record<string, number>) {
     return Object.fromEntries(
       Object.entries(scores).map(([key, value]) => [this.translateEmotion(key), value]),
@@ -40,16 +67,21 @@ export class ReportPresenter {
       return null;
     }
 
+    const metadata = this.extractAiMetadata(aggregate.analysis.relevantSignals);
+
     return {
       dominant_emotion: this.translateEmotion(aggregate.analysis.dominantEmotion),
       emotion_scores: this.translateEmotionScores(aggregate.analysis.emotionScores),
       risk_ai: aggregate.analysis.riskAi,
       confidence: aggregate.analysis.confidence,
-      relevant_signals: aggregate.analysis.relevantSignals.map((signal) =>
+      relevant_signals: metadata.visibleSignals.map((signal) =>
         this.translateSignal(signal),
       ),
+      explanation: metadata.explanation,
+      recommended_action: metadata.recommendedAction,
+      context_summary: metadata.contextSummary,
       model_version: aggregate.analysis.modelVersion,
-      note: 'Clasificación preliminar generada por IA local; requiere revisión humana.',
+      note: 'Clasificacion preliminar generada por IA; requiere revision humana.',
     };
   }
 
