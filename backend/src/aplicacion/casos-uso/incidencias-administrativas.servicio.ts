@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { RegistrarProcesoAdministrativoDto } from '../dto/registrar-proceso-administrativo.dto';
 import { FiltroAlertasDto } from '../dto/filtro-alertas.dto';
 import { HistoriaAlertaDto } from '../dto/historia-alerta.dto';
@@ -13,9 +17,7 @@ import { AlertaEntidad } from '../../dominio/entidades/alerta.entidad';
 import { ProcesoAdministrativoEntidad } from '../../dominio/entidades/proceso-administrativo.entidad';
 
 @Injectable()
-export class IncidenciasAdministrativasServicio
-  implements GestionarIncidenciasAdministrativasCasoUso
-{
+export class IncidenciasAdministrativasServicio implements GestionarIncidenciasAdministrativasCasoUso {
   constructor(
     private readonly repositorioAlerta: RepositorioAlertaPuerto,
     private readonly repositorioProcesoAdministrativo: RepositorioProcesoAdministrativoPuerto,
@@ -44,7 +46,8 @@ export class IncidenciasAdministrativasServicio
       throw new NotFoundException('La incidencia no existe');
     }
 
-    const historia = await this.repositorioAlerta.obtenerHistoriaPorId(alertaId);
+    const historia =
+      await this.repositorioAlerta.obtenerHistoriaPorId(alertaId);
     if (!historia || historia.seguimientos.length === 0) {
       throw new BadRequestException(
         'La incidencia todavia no fue derivada por psicologia',
@@ -72,7 +75,8 @@ export class IncidenciasAdministrativasServicio
     dto: RegistrarAvanceProcesoAdministrativoDto,
     usuarioActual: UsuarioAutenticadoDto,
   ): Promise<AvanceProcesoAdministrativoEntidad> {
-    const proceso = await this.repositorioProcesoAdministrativo.obtenerPorId(procesoId);
+    const proceso =
+      await this.repositorioProcesoAdministrativo.obtenerPorId(procesoId);
     if (!proceso) {
       throw new NotFoundException('El proceso administrativo no existe');
     }
