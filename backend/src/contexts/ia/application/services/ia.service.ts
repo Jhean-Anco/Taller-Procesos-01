@@ -1,4 +1,3 @@
-import { Inject, Injectable } from '@nestjs/common';
 import { PUERTO_PROVEEDOR_IA } from '../ports/output/proveedor-ia.port';
 import type { PuertoProveedorIa } from '../ports/output/proveedor-ia.port';
 import { REPOSITORIO_REGISTRO_SOLICITUD } from '../ports/output/registro-solicitud.repository';
@@ -22,12 +21,9 @@ export interface SolicitudAnalisisCriticidad {
   observaciones?: string;
 }
 
-@Injectable()
 export class IaService {
   constructor(
-    @Inject(PUERTO_PROVEEDOR_IA)
     private readonly puertoProveedorIa: PuertoProveedorIa,
-    @Inject(REPOSITORIO_REGISTRO_SOLICITUD)
     private readonly repositorioRegistroSolicitud: RepositorioRegistroSolicitud,
   ) {}
 

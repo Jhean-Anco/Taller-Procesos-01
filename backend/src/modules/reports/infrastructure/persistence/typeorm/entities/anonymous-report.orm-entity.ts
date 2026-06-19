@@ -45,6 +45,12 @@ export class AnonymousReportOrmEntity {
   @Column('timestamp', { name: 'analysis_requested_at', default: () => 'now()' })
   analysisRequestedAt!: Date;
 
+  @Column('varchar', { name: 'analysis_worker_id', length: 80, nullable: true })
+  analysisWorkerId!: string | null;
+
+  @Column('timestamp', { name: 'analysis_acquired_at', nullable: true })
+  analysisAcquiredAt!: Date | null;
+
   @Column('timestamp', { name: 'archived_at', nullable: true })
   archivedAt!: Date | null;
 

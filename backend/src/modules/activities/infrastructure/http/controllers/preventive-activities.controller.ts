@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { Rol } from '../../../../../shared/domain/enums/rol.enum';
 import { ProtegerRuta } from '../../../../../shared/infrastructure/auth/proteger-ruta.decorator';
@@ -8,6 +8,7 @@ import {
   UpdatePreventiveActivityDto,
   UpdatePreventiveActivityStatusDto,
 } from '../../../application/dtos/activity.dtos';
+import { ActivityNotFoundError } from '../../../application/errors/activities.errors';
 import { ActivitiesService } from '../../../application/use-cases/activities.service';
 
 type RequestWithUser = Request & { usuario?: UsuarioAutenticado };
@@ -18,7 +19,7 @@ export class PreventiveActivitiesController {
   constructor(private readonly activitiesService: ActivitiesService) {}
 
   @Post()
-  create(@Body() dto: CreatePreventiveActivityDto, @Req() request: RequestWithUser) {
+  async create(@Body() dto: CreatePreventiveActivityDto, @Req() request: RequestWithUser) {
     return this.activitiesService.create(dto, request.usuario?.id ?? 'unknown', request.ip);
   }
 
@@ -28,25 +29,40 @@ export class PreventiveActivitiesController {
   }
 
   @Patch(':id')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() dto: UpdatePreventiveActivityDto,
     @Req() request: RequestWithUser,
   ) {
-    return this.activitiesService.update(id, dto, request.usuario?.id ?? 'unknown', request.ip);
+    try {
+      return await this.activitiesService.update(id, dto, request.usuario?.id ?? 'unknown', request.ip);
+    } catch (error) {
+      this.translate(error);
+    }
   }
 
   @Patch(':id/status')
-  changeStatus(
+  async changeStatus(
     @Param('id') id: string,
     @Body() dto: UpdatePreventiveActivityStatusDto,
     @Req() request: RequestWithUser,
   ) {
-    return this.activitiesService.changeStatus(
-      id,
-      dto.status,
-      request.usuario?.id ?? 'unknown',
-      request.ip,
-    );
+    try {
+      return await this.activitiesService.changeStatus(
+        id,
+        dto.status,
+        request.usuario?.id ?? 'unknown',
+        request.ip,
+      );
+    } catch (error) {
+      this.translate(error);
+    }
+  }
+
+  private translate(error: unknown): never {
+    if (error instanceof ActivityNotFoundError) {
+      throw new NotFoundException(error.message);
+    }
+    throw error instanceof Error ? error : new BadRequestException('Error inesperado');
   }
 }

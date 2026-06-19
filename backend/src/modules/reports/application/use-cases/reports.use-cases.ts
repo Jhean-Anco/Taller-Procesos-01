@@ -1,4 +1,3 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   AlertGeneratedBy,
   DerivationStatus,
@@ -19,21 +18,19 @@ import { TextPrivacyService } from '../../domain/services/text-privacy.service';
 import { AI_ANALYZER, AiAnalyzerPort } from '../ports/ai-analyzer.port';
 import { CreateAnonymousReportDto, DeriveReportDto, ReviewReportDto } from '../dtos/report.dtos';
 import { ReportPresenter } from '../presenters/report.presenter';
+import { ArchivedReportError, ReportNotFoundError, ReportValidationError } from '../errors/reports.errors';
 
 export interface InternalActor {
   id: string;
   ip?: string | null;
 }
 
-@Injectable()
 export class ReportsUseCases {
   private readonly presenter = new ReportPresenter();
   private readonly privacy = new TextPrivacyService();
 
   constructor(
-    @Inject(REPORTS_REPOSITORY)
     private readonly reportsRepository: ReportsRepository,
-    @Inject(AI_ANALYZER)
     private readonly aiAnalyzer: AiAnalyzerPort,
     private readonly alertsService: AlertsService,
     private readonly auditService: AuditService,
@@ -41,7 +38,7 @@ export class ReportsUseCases {
 
   async createAnonymousReport(dto: CreateAnonymousReportDto) {
     if (!dto.consent_accepted) {
-      throw new BadRequestException('Debes aceptar el aviso informativo');
+      throw new ReportValidationError('Debes aceptar el aviso informativo');
     }
 
     const now = new Date();
@@ -72,7 +69,7 @@ export class ReportsUseCases {
   async getPublicStatus(publicCode: string) {
     const aggregate = await this.reportsRepository.findByPublicCode(publicCode);
     if (!aggregate) {
-      throw new NotFoundException('Reporte anonimo no encontrado');
+      throw new ReportNotFoundError();
     }
     return this.presenter.publicStatus(aggregate);
   }
@@ -208,7 +205,7 @@ export class ReportsUseCases {
   async getForAdmin(id: string) {
     const aggregate = await this.ensureAnalysisIfNeeded(await this.getAggregate(id));
     if (aggregate.report.archivedAt || aggregate.report.archiveStatus === 'ARCHIVED') {
-      throw new BadRequestException('El reporte esta archivado');
+      throw new ArchivedReportError();
     }
     return this.presenter.adminDetailedReport(aggregate);
   }
@@ -329,7 +326,7 @@ export class ReportsUseCases {
   private async getAggregate(id: string) {
     const aggregate = await this.reportsRepository.findById(id);
     if (!aggregate) {
-      throw new NotFoundException('Reporte anonimo no encontrado');
+      throw new ReportNotFoundError();
     }
     return aggregate;
   }

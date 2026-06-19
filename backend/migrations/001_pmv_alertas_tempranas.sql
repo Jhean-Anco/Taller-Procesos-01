@@ -5,38 +5,49 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(40) NOT NULL CHECK (role IN ('PSYCHOLOGIST', 'ADMIN_DIRECTOR')),
   active BOOLEAN NOT NULL DEFAULT TRUE,
+  token_version INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT now(),
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
-INSERT INTO users (id, name, email, password_hash, role, active, created_at, updated_at)
-VALUES
-  (
-    COALESCE(current_setting('app.bootstrap_admin_id', true), 'usr_seed_admin_agora'),
-    COALESCE(current_setting('app.bootstrap_admin_name', true), 'Administrador Agora'),
-    current_setting('app.bootstrap_admin_email', true),
-    current_setting('app.bootstrap_admin_password_hash', true),
-    'ADMIN_DIRECTOR',
-    TRUE,
-    now(),
-    now()
-  ),
-  (
-    COALESCE(current_setting('app.bootstrap_psychologist_id', true), 'usr_seed_psicologo_agora'),
-    COALESCE(current_setting('app.bootstrap_psychologist_name', true), 'Psicologia Agora'),
-    current_setting('app.bootstrap_psychologist_email', true),
-    current_setting('app.bootstrap_psychologist_password_hash', true),
-    'PSYCHOLOGIST',
-    TRUE,
-    now(),
-    now()
-  )
-ON CONFLICT (email) DO UPDATE SET
-  name = EXCLUDED.name,
-  password_hash = EXCLUDED.password_hash,
-  role = EXCLUDED.role,
-  active = TRUE,
-  updated_at = now();
+DO $$
+BEGIN
+  IF current_setting('app.bootstrap_admin_email', true) IS NOT NULL
+     AND current_setting('app.bootstrap_admin_password_hash', true) IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM users WHERE email = current_setting('app.bootstrap_admin_email', true)
+     ) THEN
+    INSERT INTO users (id, name, email, password_hash, role, active, created_at, updated_at)
+    VALUES (
+      COALESCE(current_setting('app.bootstrap_admin_id', true), 'usr_seed_admin_agora'),
+      COALESCE(current_setting('app.bootstrap_admin_name', true), 'Administrador Agora'),
+      current_setting('app.bootstrap_admin_email', true),
+      current_setting('app.bootstrap_admin_password_hash', true),
+      'ADMIN_DIRECTOR',
+      TRUE,
+      now(),
+      now()
+    );
+  END IF;
+
+  IF current_setting('app.bootstrap_psychologist_email', true) IS NOT NULL
+     AND current_setting('app.bootstrap_psychologist_password_hash', true) IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM users WHERE email = current_setting('app.bootstrap_psychologist_email', true)
+     ) THEN
+    INSERT INTO users (id, name, email, password_hash, role, active, created_at, updated_at)
+    VALUES (
+      COALESCE(current_setting('app.bootstrap_psychologist_id', true), 'usr_seed_psicologo_agora'),
+      COALESCE(current_setting('app.bootstrap_psychologist_name', true), 'Psicologia Agora'),
+      current_setting('app.bootstrap_psychologist_email', true),
+      current_setting('app.bootstrap_psychologist_password_hash', true),
+      'PSYCHOLOGIST',
+      TRUE,
+      now(),
+      now()
+    );
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS anonymous_reports (
   id VARCHAR(64) PRIMARY KEY,
@@ -45,7 +56,9 @@ CREATE TABLE IF NOT EXISTS anonymous_reports (
   section_reference VARCHAR(20),
   age_range VARCHAR(30),
   emotional_form JSONB NOT NULL DEFAULT '{}'::jsonb,
+  emotional_form_ciphertext TEXT,
   message_text TEXT NOT NULL,
+  message_text_ciphertext TEXT,
   consent_accepted BOOLEAN NOT NULL,
   status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING', 'IN_REVIEW', 'ADDRESSED', 'CLOSED')),
   analysis_queue_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (analysis_queue_status IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED')),
@@ -53,6 +66,8 @@ CREATE TABLE IF NOT EXISTS anonymous_reports (
   analysis_next_attempt_at TIMESTAMP,
   analysis_last_error TEXT,
   analysis_requested_at TIMESTAMP NOT NULL DEFAULT now(),
+  analysis_worker_id VARCHAR(80),
+  analysis_acquired_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT now(),
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );

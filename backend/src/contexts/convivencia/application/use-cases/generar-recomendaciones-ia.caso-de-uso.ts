@@ -1,9 +1,7 @@
-import { Injectable } from '@nestjs/common';
 import { CasoDeUso } from '../../../../shared/domain/caso-de-uso.interface';
 import { GenerarTextoCasoDeUso } from '../../../ia/application/use-cases/generar-texto.caso-de-uso';
 import { ObtenerEstadisticasClimaEscolarCasoDeUso } from './obtener-estadisticas-clima-escolar.caso-de-uso';
 
-@Injectable()
 export class GenerarRecomendacionesIaCasoDeUso implements CasoDeUso<
   Promise<{ recomendaciones: string }>,
   [string]

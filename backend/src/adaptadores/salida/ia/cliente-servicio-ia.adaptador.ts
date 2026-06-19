@@ -29,7 +29,8 @@ export class ClienteServicioIaAdaptador implements EvaluadorRiesgoIaPuerto {
 
   constructor(private readonly configService: ConfigService) {
     this.urlServicio =
-      this.configService.get<string>('IA_SERVICIO_URL') ?? 'http://127.0.0.1:8000';
+      this.configService.get<string>('IA_SERVICIO_URL') ??
+      'http://127.0.0.1:8000';
     this.timeoutMs = Number(
       this.configService.get<string>('IA_SERVICIO_TIMEOUT_MS') ?? 7000,
     );
@@ -117,7 +118,9 @@ export class ClienteServicioIaAdaptador implements EvaluadorRiesgoIaPuerto {
 
     const nivel = (datos.nivel_de_riesgo ?? '').toUpperCase();
     const prediccion = datos.detalles_tecnicos?.prediccion_arbol ?? 0;
-    const sentimiento = (datos.detalles_tecnicos?.sentimiento_texto ?? '').toUpperCase();
+    const sentimiento = (
+      datos.detalles_tecnicos?.sentimiento_texto ?? ''
+    ).toUpperCase();
 
     if (nivel.includes('ALTO')) {
       if (prediccion === 1 && sentimiento === 'NEG') return 95;

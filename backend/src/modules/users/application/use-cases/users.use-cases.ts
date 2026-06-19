@@ -1,9 +1,3 @@
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
 import { generarIdSeguro } from '../../../shared/domain/id-generator';
 import { InternalUser } from '../../domain/entities/internal-user.entity';
 import {
@@ -19,13 +13,11 @@ import {
   InternalUserResponseDto,
   UpdateInternalUserDto,
 } from '../dtos/user.dtos';
+import { UserConflictError, UserNotFoundError } from '../errors/users.errors';
 
-@Injectable()
 export class UsersUseCases {
   constructor(
-    @Inject(USERS_REPOSITORY)
     private readonly usersRepository: UsersRepository,
-    @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasherPort,
   ) {}
 
@@ -33,7 +25,7 @@ export class UsersUseCases {
     const email = dto.email.toLowerCase();
     const existing = await this.usersRepository.findByEmail(email);
     if (existing) {
-      throw new ConflictException('El correo ya esta registrado');
+      throw new UserConflictError();
     }
 
     const now = new Date();
@@ -44,7 +36,7 @@ export class UsersUseCases {
       passwordHash: await this.passwordHasher.hash(dto.password),
       role: dto.role,
       active: true,
-      tokenVersion: 0,
+      tokenVersion: 1,
       createdAt: now,
       updatedAt: now,
     });
@@ -63,17 +55,17 @@ export class UsersUseCases {
   ): Promise<InternalUserResponseDto> {
     const current = await this.usersRepository.findById(id);
     if (!current) {
-      throw new NotFoundException('Usuario interno no encontrado');
+      throw new UserNotFoundError();
     }
 
     if (dto.email) {
       const sameEmail = await this.usersRepository.findByEmail(dto.email);
       if (sameEmail && sameEmail.id !== id) {
-        throw new ConflictException('El correo ya esta registrado');
+        throw new UserConflictError();
       }
     }
-
-    return this.present(await this.usersRepository.save(current.update(dto)));
+    const updated = current.update(dto);
+    return this.present(await this.usersRepository.save(updated));
   }
 
   async changeStatus(
@@ -82,12 +74,11 @@ export class UsersUseCases {
   ): Promise<InternalUserResponseDto> {
     const current = await this.usersRepository.findById(id);
     if (!current) {
-      throw new NotFoundException('Usuario interno no encontrado');
+      throw new UserNotFoundError();
     }
 
-    return this.present(
-      await this.usersRepository.save(current.changeStatus(active)),
-    );
+    const updated = current.changeStatus(active);
+    return this.present(await this.usersRepository.save(updated));
   }
 
   private present(user: InternalUser): InternalUserResponseDto {

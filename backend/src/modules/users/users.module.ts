@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MemoryStoreModule } from '../shared/infrastructure/memory/memory-store.module';
+import { PASSWORD_HASHER, PasswordHasherPort } from './application/ports/password-hasher.port';
 import { UsersUseCases } from './application/use-cases/users.use-cases';
-import { PASSWORD_HASHER } from './application/ports/password-hasher.port';
 import { USERS_REPOSITORY } from './domain/repositories/users.repository';
 import { UsersController } from './infrastructure/http/controllers/users.controller';
 import { InMemoryUsersRepository } from './infrastructure/persistence/memory/in-memory-users.repository';
@@ -19,9 +19,19 @@ const databaseEnabled = process.env.DATABASE_ENABLED === 'true';
   ],
   controllers: [UsersController],
   providers: [
-    UsersUseCases,
     BcryptPasswordHasherAdapter,
     ...(databaseEnabled ? [TypeOrmUsersRepository] : [InMemoryUsersRepository]),
+    {
+      provide: UsersUseCases,
+      useFactory: (
+        usersRepository: typeof TypeOrmUsersRepository | typeof InMemoryUsersRepository,
+        passwordHasher: PasswordHasherPort,
+      ) => new UsersUseCases(usersRepository as never, passwordHasher),
+      inject: [
+        databaseEnabled ? TypeOrmUsersRepository : InMemoryUsersRepository,
+        PASSWORD_HASHER,
+      ],
+    },
     {
       provide: PASSWORD_HASHER,
       useExisting: BcryptPasswordHasherAdapter,

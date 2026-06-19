@@ -1,4 +1,3 @@
-import { Inject, Injectable } from '@nestjs/common';
 import { CasoDeUso } from '../../../../shared/domain/caso-de-uso.interface';
 import { RespuestaIa } from '../../domain/entities/respuesta-ia.entidad';
 import { PUERTO_PROVEEDOR_IA } from '../ports/output/proveedor-ia.port';
@@ -11,15 +10,12 @@ export interface ComandoGenerarTexto {
   rolSolicitante: string;
 }
 
-@Injectable()
 export class GenerarTextoCasoDeUso implements CasoDeUso<
   Promise<RespuestaIa>,
   [ComandoGenerarTexto]
 > {
   constructor(
-    @Inject(PUERTO_PROVEEDOR_IA)
     private readonly proveedorIa: PuertoProveedorIa,
-    @Inject(REPOSITORIO_REGISTRO_SOLICITUD)
     private readonly repositorioRegistroSolicitud: RepositorioRegistroSolicitud,
   ) {}
 

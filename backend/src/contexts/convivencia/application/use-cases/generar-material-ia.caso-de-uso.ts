@@ -1,4 +1,3 @@
-import { Injectable } from '@nestjs/common';
 import { CasoDeUso } from '../../../../shared/domain/caso-de-uso.interface';
 import { GenerarTextoCasoDeUso } from '../../../ia/application/use-cases/generar-texto.caso-de-uso';
 
@@ -9,7 +8,6 @@ export interface ComandoGenerarMaterialIa {
   rolSolicitante: string;
 }
 
-@Injectable()
 export class GenerarMaterialIaCasoDeUso implements CasoDeUso<
   Promise<{ materialSugerido: string }>,
   [ComandoGenerarMaterialIa]

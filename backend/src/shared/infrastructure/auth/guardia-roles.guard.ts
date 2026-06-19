@@ -2,11 +2,14 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Inject,
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { Rol } from '../../domain/enums/rol.enum';
+import { InternalUserRole } from '../../../modules/shared/domain/enums';
+import { USERS_REPOSITORY, UsersRepository } from '../../../modules/users/domain/repositories/users.repository';
 import { ROLES_RUTA_CLAVE } from './proteger-ruta.decorator';
 import { UsuarioAutenticado } from './usuario-autenticado.interface';
 
@@ -16,9 +19,12 @@ type PeticionConUsuario = Request & {
 
 @Injectable()
 export class GuardiaRoles implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    @Inject(USERS_REPOSITORY) private readonly usersRepository: UsersRepository,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const rolesPermitidos = this.reflector.getAllAndOverride<Rol[]>(
       ROLES_RUTA_CLAVE,
       [context.getHandler(), context.getClass()],
@@ -30,9 +36,12 @@ export class GuardiaRoles implements CanActivate {
 
     const request = context.switchToHttp().getRequest<PeticionConUsuario>();
     const usuario = request.usuario;
-    const rolUsuario = usuario?.rol;
+    const usuarioActual = usuario?.id
+      ? await this.usersRepository.findById(usuario.id)
+      : null;
+    const rolUsuario = this.normalizarRol(usuarioActual?.role ?? usuario?.rol);
 
-    if (!usuario || !this.esRolPermitido(rolUsuario, rolesPermitidos)) {
+    if (!usuarioActual?.active || !this.esRolPermitido(rolUsuario, rolesPermitidos)) {
       throw new ForbiddenException(
         'No tienes permisos para acceder a este recurso',
       );
@@ -54,5 +63,25 @@ export class GuardiaRoles implements CanActivate {
     };
 
     return equivalentes[rolUsuario].some((rol) => rolesPermitidos.includes(rol));
+  }
+
+  private normalizarRol(rol: InternalUserRole | Rol | undefined): Rol | undefined {
+    if (!rol) return undefined;
+    const map: Record<string, Rol> = {
+      PSYCHOLOGIST: Rol.PSYCHOLOGIST,
+      psicologo: Rol.PSICOLOGO,
+      ADMIN_DIRECTOR: Rol.ADMIN_DIRECTOR,
+      admin_director: Rol.ADMIN_DIRECTOR,
+      ADMIN: Rol.ADMIN,
+      admin: Rol.ADMIN,
+      DOCENTE: Rol.DOCENTE,
+      docente: Rol.DOCENTE,
+      ADMINISTRATIVO: Rol.ADMINISTRATIVO,
+      administrativo: Rol.ADMINISTRATIVO,
+      ESTUDIANTE: Rol.ESTUDIANTE,
+      estudiante: Rol.ESTUDIANTE,
+      PSICOLOGO: Rol.PSICOLOGO,
+    };
+    return map[String(rol)];
   }
 }

@@ -1,4 +1,3 @@
-import { Inject, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { IaService } from '../../../ia/application/services/ia.service';
 import {
@@ -18,6 +17,7 @@ import { ReporteAnonimo } from '../../domain/entities/reporte-anonimo.entidad';
 import { UsuarioInstitucional } from '../../domain/entities/usuario-institucional.entidad';
 import { NivelEscolar } from '../../domain/enums/nivel-escolar.enum';
 import { TipoIncidencia } from '../../domain/enums/tipo-incidencia.enum';
+import { ConvivenciaNotFoundError } from '../errors/convivencia.errors';
 
 export interface SolicitudMaterialIa {
   tema: string;
@@ -52,10 +52,8 @@ export interface SolicitudAtencionManual {
   atendidoPor: string;
 }
 
-@Injectable()
 export class ConvivenciaService {
   constructor(
-    @Inject(REPOSITORIO_CONVIVENCIA)
     private readonly repositorioConvivencia: RepositorioConvivencia,
     private readonly iaService: IaService,
   ) {}

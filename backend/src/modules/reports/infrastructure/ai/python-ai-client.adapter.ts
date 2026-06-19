@@ -229,7 +229,7 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
   }
 
   private buildGeminiPrompt(input: AiAnalysisInput): string {
-    const sanitizedMessage = this.privacy.buildNonSensitiveSummary(input.message, 1200);
+    const sanitizedMessage = this.privacy.buildNonSensitiveSummary(input.message, 600);
     const sanitizedForm = this.privacy.sanitizeSignals(
       Object.entries(input.emotionalForm).map(([key, value]) => `${key}:${String(value)}`),
     );
@@ -239,7 +239,7 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       'Devuelve SOLO JSON valido con esta forma exacta:',
       '{"dominant_emotion":"fear|sadness|anxiety|anger|neutral|uncertain","emotion_scores":{"fear":0,"sadness":0,"anxiety":0,"anger":0,"neutral":0},"risk_ai":"LOW|MEDIUM|HIGH","confidence":0.0,"relevant_signals":["..."],"explanation":"...","recommended_action":"...","context_summary":"..."}',
       'Criterios: HIGH solo si hay amenaza, violencia, abuso, autolesion, arma, golpe serio o peligro inmediato. MEDIUM si hay acoso, aislamiento, miedo, tristeza o ansiedad recurrente sin peligro inmediato. LOW si son molestias leves, orientacion general o malestar puntual.',
-      'La explicacion y la recomendacion deben ser especificas del texto; evita frases genericas repetidas por nivel.',
+      'La explicacion y la recomendacion deben ser categorizadas y anonimizadas; no copies fragmentos del reporte.',
       `Formulario emocional resumido: ${JSON.stringify(sanitizedForm)}`,
       `Reporte anonimo resumido: ${sanitizedMessage}`,
     ].join('\n');
@@ -293,13 +293,9 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
 
   private metadataSignals(payload: GeminiAnalysisPayload): string[] {
     return [
-      payload.explanation ? `explicacion::${payload.explanation.trim()}` : null,
-      payload.recommended_action
-        ? `accion::${payload.recommended_action.trim()}`
-        : null,
-      payload.context_summary
-        ? `resumen::${payload.context_summary.trim()}`
-        : null,
+      payload.explanation ? 'explicacion::categorias_anonimizadas' : null,
+      payload.recommended_action ? 'accion::seguimiento_humano' : null,
+      payload.context_summary ? 'resumen::anonimo' : null,
     ].filter((item): item is string => Boolean(item));
   }
 
@@ -532,55 +528,7 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
     const formSignals = this.describeFormSignals(input.emotionalForm).filter(
       (signal) => !baseSignals.includes(signal),
     );
-    const hasMetadata = baseSignals.some(
-      (signal) =>
-        signal.startsWith('explicacion::') ||
-        signal.startsWith('accion::') ||
-        signal.startsWith('resumen::'),
-    );
-
-    return [
-      ...baseSignals,
-      ...formSignals.slice(0, 4),
-      ...(hasMetadata
-        ? []
-        : this.localExplanationSignals(input, riskAi, signals, formSignals)),
-    ];
-  }
-
-  private localExplanationSignals(
-    input: AiAnalysisInput,
-    riskAi: RiskLevel,
-    signals: string[],
-    formSignals: string[],
-  ) {
-    const signalText =
-      signals.length > 0
-        ? `menciona ${signals.join(', ')}`
-        : 'no contiene palabras criticas directas';
-    const formText =
-      formSignals.length > 0
-        ? `el formulario marca ${formSignals.slice(0, 3).join(', ')}`
-        : 'el formulario no agrega indicadores intensos';
-    const excerpt = this.messageExcerpt(input.message);
-    const explanation =
-      riskAi === RiskLevel.HIGH
-        ? `El reporte "${excerpt}" ${signalText} y ${formText}; por eso requiere revision prioritaria.`
-        : riskAi === RiskLevel.MEDIUM
-          ? `El reporte "${excerpt}" ${signalText} y ${formText}; por eso se interpreta como malestar que necesita seguimiento.`
-          : `El reporte "${excerpt}" ${signalText} y ${formText}; por eso se mantiene como caso preventivo.`;
-    const action =
-      riskAi === RiskLevel.HIGH
-        ? 'Contactar al equipo responsable hoy y activar protocolo institucional.'
-        : riskAi === RiskLevel.MEDIUM
-          ? 'Programar seguimiento psicologico y observar el contexto reportado.'
-          : 'Registrar el caso y ofrecer orientacion preventiva.';
-    const summary = input.message.trim().slice(0, 180);
-    return [
-      `explicacion::${explanation}`,
-      `accion::${action}`,
-      `resumen::${summary}`,
-    ];
+    return [...baseSignals, ...formSignals.slice(0, 4)];
   }
 
   private describeFormSignals(form: Record<string, unknown>) {
@@ -610,10 +558,5 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       .map(([key]) => labels[key] ?? key.replace(/[_-]+/g, ' '))
       .filter((value, index, values) => values.indexOf(value) === index)
       .slice(0, 6);
-  }
-
-  private messageExcerpt(message: string) {
-    const clean = message.replace(/\s+/g, ' ').trim();
-    return clean.length > 140 ? `${clean.slice(0, 137)}...` : clean;
   }
 }

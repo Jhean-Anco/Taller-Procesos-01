@@ -1,4 +1,3 @@
-import { Inject, Injectable } from '@nestjs/common';
 import { ActivitiesService } from '../../../activities/application/use-cases/activities.service';
 import { AlertsService } from '../../../alerts/application/use-cases/alerts.service';
 import { AuditService } from '../../../audit/application/use-cases/audit.service';
@@ -9,14 +8,12 @@ import {
   ReportsRepository,
 } from '../../../reports/domain/repositories/reports.repository';
 
-@Injectable()
 export class DashboardService {
   private readonly anonymityThreshold = Number(
     process.env.ANONYMITY_MIN_GROUP_SIZE ?? 3,
   );
 
   constructor(
-    @Inject(REPORTS_REPOSITORY)
     private readonly reportsRepository: ReportsRepository,
     private readonly alertsService: AlertsService,
     private readonly activitiesService: ActivitiesService,

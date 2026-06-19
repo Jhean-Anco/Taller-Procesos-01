@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, ConflictException, Controller, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { Rol } from '../../../../../shared/domain/enums/rol.enum';
 import { ProtegerRuta } from '../../../../../shared/infrastructure/auth/proteger-ruta.decorator';
 import { UsersUseCases } from '../../../application/use-cases/users.use-cases';
+import { UserConflictError, UserNotFoundError } from '../../../application/errors/users.errors';
 import {
   CreateInternalUserDto,
   UpdateInternalUserDto,
@@ -14,8 +15,12 @@ export class UsersController {
   constructor(private readonly usersUseCases: UsersUseCases) {}
 
   @Post()
-  create(@Body() dto: CreateInternalUserDto) {
-    return this.usersUseCases.create(dto);
+  async create(@Body() dto: CreateInternalUserDto) {
+    try {
+      return await this.usersUseCases.create(dto);
+    } catch (error) {
+      this.translateError(error);
+    }
   }
 
   @Get()
@@ -24,12 +29,30 @@ export class UsersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateInternalUserDto) {
-    return this.usersUseCases.update(id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateInternalUserDto) {
+    try {
+      return await this.usersUseCases.update(id, dto);
+    } catch (error) {
+      this.translateError(error);
+    }
   }
 
   @Patch(':id/status')
-  changeStatus(@Param('id') id: string, @Body() dto: UpdateUserStatusDto) {
-    return this.usersUseCases.changeStatus(id, dto.active);
+  async changeStatus(@Param('id') id: string, @Body() dto: UpdateUserStatusDto) {
+    try {
+      return await this.usersUseCases.changeStatus(id, dto.active);
+    } catch (error) {
+      this.translateError(error);
+    }
+  }
+
+  private translateError(error: unknown): never {
+    if (error instanceof UserConflictError) {
+      throw new ConflictException(error.message);
+    }
+    if (error instanceof UserNotFoundError) {
+      throw new NotFoundException(error.message);
+    }
+    throw error instanceof Error ? error : new Error('Error inesperado');
   }
 }

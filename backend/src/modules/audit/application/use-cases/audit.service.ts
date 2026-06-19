@@ -1,7 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
 import { generarIdSeguro } from '../../../shared/domain/id-generator';
 import { AuditLog } from '../../domain/entities/audit-log.entity';
-import { AUDIT_REPOSITORY, AuditRepository } from '../../domain/repositories/audit.repository';
+import {
+  AUDIT_REPOSITORY,
+  AuditRepository,
+} from '../../domain/repositories/audit.repository';
+import { AuditPersistenceError } from '../errors/audit.errors';
 
 export interface RegisterAuditInput {
   actorUserId?: string | null;
@@ -12,26 +15,26 @@ export interface RegisterAuditInput {
   ip?: string | null;
 }
 
-@Injectable()
 export class AuditService {
-  constructor(
-    @Inject(AUDIT_REPOSITORY)
-    private readonly auditRepository: AuditRepository,
-  ) {}
+  constructor(private readonly auditRepository: AuditRepository) {}
 
   async register(input: RegisterAuditInput): Promise<void> {
-    await this.auditRepository.create(
-      new AuditLog({
-        id: generarIdSeguro('aud'),
-        actorUserId: input.actorUserId ?? null,
-        action: input.action,
-        entityType: input.entityType,
-        entityId: input.entityId ?? null,
-        metadata: this.stripSensitiveMetadata(input.metadata ?? {}),
-        ip: input.ip ?? null,
-        createdAt: new Date(),
-      }),
-    );
+    try {
+      await this.auditRepository.create(
+        new AuditLog({
+          id: generarIdSeguro('aud'),
+          actorUserId: input.actorUserId ?? null,
+          action: input.action,
+          entityType: input.entityType,
+          entityId: input.entityId ?? null,
+          metadata: this.stripSensitiveMetadata(input.metadata ?? {}),
+          ip: input.ip ?? null,
+          createdAt: new Date(),
+        }),
+      );
+    } catch {
+      throw new AuditPersistenceError();
+    }
   }
 
   async list() {
@@ -48,10 +51,19 @@ export class AuditService {
     }));
   }
 
-  private stripSensitiveMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
-    const blocked = new Set(['message_text', 'password', 'password_hash', 'observation_internal']);
+  private stripSensitiveMetadata(
+    metadata: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const blocked = new Set([
+      'message_text',
+      'password',
+      'password_hash',
+      'observation_internal',
+    ]);
     return Object.fromEntries(
-      Object.entries(metadata).filter(([key]) => !blocked.has(key.toLowerCase())),
+      Object.entries(metadata).filter(
+        ([key]) => !blocked.has(key.toLowerCase()),
+      ),
     );
   }
 }

@@ -1,4 +1,3 @@
-import { Inject, Injectable } from '@nestjs/common';
 import { CasoDeUso } from '../../../../shared/domain/caso-de-uso.interface';
 import {
   CrearIntervencion,
@@ -7,13 +6,11 @@ import {
 import type { RepositorioConvivencia } from '../ports/output/convivencia.repository';
 import { Intervencion } from '../../domain/entities/intervencion.entidad';
 
-@Injectable()
 export class AgregarIntervencionCasoDeUso implements CasoDeUso<
   Promise<Intervencion>,
   [string, CrearIntervencion]
 > {
   constructor(
-    @Inject(REPOSITORIO_CONVIVENCIA)
     private readonly repositorioConvivencia: RepositorioConvivencia,
   ) {}
 

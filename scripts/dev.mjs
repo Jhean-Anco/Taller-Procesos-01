@@ -57,8 +57,8 @@ async function startIfMissing(name, port, command, args, options = {}) {
 
 async function main() {
   await startIfMissing('ia', 8000, 'node', ['scripts/servicio-ia.mjs']);
-  console.log('Vaciando datos de la BD antes de iniciar backend...');
-  await run('npm', ['--prefix', 'backend', 'run', 'db:reset-data']);
+  console.log('Ejecutando migraciones de la BD antes de iniciar backend...');
+  await run('node', ['backend/scripts/reset-db.mjs', '--migrate-only']);
   await startIfMissing('backend', 3000, 'npm', ['--prefix', 'backend', 'run', 'dev']);
   await startIfMissing('frontend', 5173, 'npm', ['--prefix', 'frontend', 'run', 'dev', '--', '--host', '127.0.0.1', '--port', '5173']);
   console.log('Sistema listo:');

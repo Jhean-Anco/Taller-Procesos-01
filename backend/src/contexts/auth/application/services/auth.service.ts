@@ -1,19 +1,18 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { ConvivenciaService } from '../../../convivencia/application/services/convivencia.service';
 import { UsuarioAutenticado } from '../../../../shared/infrastructure/auth/usuario-autenticado.interface';
+import { InvalidCredentialsError } from '../errors/auth.errors';
+import type { TokenSignerPort } from '../ports/output/token-signer.port';
 
 export interface SolicitudLogin {
   correo: string;
   password: string;
 }
 
-@Injectable()
 export class AuthService {
   constructor(
     private readonly convivenciaService: ConvivenciaService,
-    private readonly jwtService: JwtService,
+    private readonly tokenSigner: TokenSignerPort,
   ) {}
 
   async login(
@@ -25,7 +24,7 @@ export class AuthService {
       );
 
     if (!usuario?.activo) {
-      throw new UnauthorizedException('Credenciales invalidas');
+      throw new InvalidCredentialsError();
     }
 
     const passwordValida = await bcrypt.compare(
@@ -34,7 +33,7 @@ export class AuthService {
     );
 
     if (!passwordValida) {
-      throw new UnauthorizedException('Credenciales invalidas');
+      throw new InvalidCredentialsError();
     }
 
     const usuarioAutenticado: UsuarioAutenticado = {
@@ -44,7 +43,7 @@ export class AuthService {
       rol: usuario.rol,
     };
 
-    const accessToken = await this.jwtService.signAsync(usuarioAutenticado);
+    const accessToken = await this.tokenSigner.sign(usuarioAutenticado);
 
     return {
       accessToken,

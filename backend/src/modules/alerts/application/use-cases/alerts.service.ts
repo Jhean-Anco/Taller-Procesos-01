@@ -1,4 +1,3 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   AlertGeneratedBy,
   AlertStatus,
@@ -11,11 +10,10 @@ import {
   AlertFilters,
   AlertsRepository,
 } from '../../domain/repositories/alerts.repository';
+import { AlertNotFoundError } from '../errors/alerts.errors';
 
-@Injectable()
 export class AlertsService {
   constructor(
-    @Inject(ALERTS_REPOSITORY)
     private readonly alertsRepository: AlertsRepository,
   ) {}
 
@@ -55,7 +53,7 @@ export class AlertsService {
   async get(id: string) {
     const alert = await this.alertsRepository.findById(id);
     if (!alert) {
-      throw new NotFoundException('Alerta no encontrada');
+      throw new AlertNotFoundError();
     }
     return this.present(alert);
   }
@@ -63,7 +61,7 @@ export class AlertsService {
   async updateStatus(id: string, status: AlertStatus) {
     const alert = await this.alertsRepository.findById(id);
     if (!alert) {
-      throw new NotFoundException('Alerta no encontrada');
+      throw new AlertNotFoundError();
     }
     return this.present(await this.alertsRepository.save(alert.updateStatus(status)));
   }

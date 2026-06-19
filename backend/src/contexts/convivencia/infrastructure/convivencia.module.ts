@@ -1,8 +1,10 @@
 import { DynamicModule, Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConvivenciaControlador } from './adapters/input/http/convivencia.controller';
+import { ModuloIa } from '../../ia/infrastructure/ia.module';
+import { IaService } from '../../ia/application/services/ia.service';
 import { ConvivenciaService } from '../application/services/convivencia.service';
 import { REPOSITORIO_CONVIVENCIA } from '../application/ports/output/convivencia.repository';
+import { ConvivenciaControlador } from './adapters/input/http/convivencia.controller';
 import { RepositorioConvivenciaMemoria } from './persistence/in-memory/convivencia-memoria.repository';
 import { AtencionManualOrmEntity } from './persistence/typeorm/entities/atencion-manual.orm-entity';
 import { IncidenciaPsicologicaOrmEntity } from './persistence/typeorm/entities/incidencia-psicologica.orm-entity';
@@ -22,31 +24,39 @@ export class ModuloConvivencia {
 
     return {
       module: ModuloConvivencia,
-      // El contexto puede correr contra TypeORM o contra memoria según el entorno.
-      imports: habilitado
-        ? [
-            TypeOrmModule.forFeature([
-              UsuarioInstitucionalOrmEntity,
-              ReporteAnonimoOrmEntity,
-              IncidenciaPsicologicaOrmEntity,
-              IntervencionOrmEntity,
-              MaterialDocenteOrmEntity,
-              AtencionManualOrmEntity,
-            ]),
-          ]
-        : [],
+      imports: [
+        ModuloIa.registrar(),
+        ...(habilitado
+          ? [
+              TypeOrmModule.forFeature([
+                UsuarioInstitucionalOrmEntity,
+                ReporteAnonimoOrmEntity,
+                IncidenciaPsicologicaOrmEntity,
+                IntervencionOrmEntity,
+                MaterialDocenteOrmEntity,
+                AtencionManualOrmEntity,
+              ]),
+            ]
+          : []),
+      ],
       controllers: [ConvivenciaControlador],
       providers: [
-        ConvivenciaService,
         ...(habilitado
           ? [RepositorioConvivenciaTypeOrm]
           : [RepositorioConvivenciaMemoria]),
-        // El puerto de salida queda desacoplado de la implementación concreta elegida.
         {
           provide: REPOSITORIO_CONVIVENCIA,
           useExisting: habilitado
             ? RepositorioConvivenciaTypeOrm
             : RepositorioConvivenciaMemoria,
+        },
+        {
+          provide: ConvivenciaService,
+          useFactory: (
+            repositorioConvivencia: unknown,
+            iaService: IaService,
+          ) => new ConvivenciaService(repositorioConvivencia as never, iaService as never),
+          inject: [REPOSITORIO_CONVIVENCIA, IaService],
         },
       ],
       exports: [ConvivenciaService, REPOSITORIO_CONVIVENCIA],

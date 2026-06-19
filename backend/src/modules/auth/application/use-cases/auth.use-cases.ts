@@ -1,4 +1,3 @@
-import { HttpException, HttpStatus, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuditService } from '../../../audit/application/use-cases/audit.service';
 import { Rol } from '../../../../shared/domain/enums/rol.enum';
 import { UsuarioAutenticado } from '../../../../shared/infrastructure/auth/usuario-autenticado.interface';
@@ -7,19 +6,15 @@ import { PASSWORD_HASHER, PasswordHasherPort } from '../../../users/application/
 import { LoginDto } from '../dtos/auth.dtos';
 import { LEGACY_AUTH_FALLBACK, LegacyAuthFallbackPort } from '../ports/legacy-auth-fallback.port';
 import { TOKEN_SIGNER, TokenSignerPort } from '../ports/token-signer.port';
+import { InvalidCredentialsError, LoginRateLimitExceededError } from '../errors/auth.errors';
 
-@Injectable()
 export class AuthUseCases {
   private readonly failedAttempts = new Map<string, { count: number; blockedUntil: number }>();
 
   constructor(
-    @Inject(USERS_REPOSITORY)
     private readonly usersRepository: UsersRepository,
-    @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasherPort,
-    @Inject(TOKEN_SIGNER)
     private readonly tokenSigner: TokenSignerPort,
-    @Inject(LEGACY_AUTH_FALLBACK)
     private readonly legacyFallback: LegacyAuthFallbackPort,
     private readonly auditService: AuditService,
   ) {}
@@ -30,7 +25,7 @@ export class AuthUseCases {
     this.applyBackoff(email, ip);
 
     if (!email || !password) {
-      throw new UnauthorizedException('Credenciales invalidas');
+      throw new InvalidCredentialsError();
     }
 
     const user = await this.usersRepository.findByEmail(email);
@@ -52,7 +47,7 @@ export class AuthUseCases {
 
     if (!authenticated) {
       this.registerFailure(email, ip);
-      throw new UnauthorizedException('Credenciales invalidas');
+      throw new InvalidCredentialsError();
     }
 
     const accessToken = await this.tokenSigner.sign(authenticated);
@@ -81,10 +76,7 @@ export class AuthUseCases {
     const key = `${email}:${ip ?? 'unknown'}`;
     const entry = this.failedAttempts.get(key);
     if (entry && entry.blockedUntil > Date.now()) {
-      throw new HttpException(
-        'Demasiados intentos. Espera antes de volver a intentar.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw new LoginRateLimitExceededError();
     }
   }
 

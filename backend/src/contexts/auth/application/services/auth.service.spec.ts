@@ -1,9 +1,9 @@
-import { UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { ConvivenciaService } from '../../../convivencia/application/services/convivencia.service';
 import { Rol } from '../../../../shared/domain/enums/rol.enum';
 import { AuthService } from './auth.service';
+import { TokenSignerPort } from '../ports/output/token-signer.port';
+import { InvalidCredentialsError } from '../errors/auth.errors';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -12,7 +12,7 @@ jest.mock('bcrypt', () => ({
 describe('AuthService', () => {
   let service: AuthService;
   let convivenciaService: jest.Mocked<ConvivenciaService>;
-  let jwtService: jest.Mocked<JwtService>;
+  let tokenSigner: jest.Mocked<TokenSignerPort>;
   let bcryptCompareMock: jest.MockedFunction<typeof bcrypt.compare>;
 
   beforeEach(() => {
@@ -20,11 +20,11 @@ describe('AuthService', () => {
       obtenerUsuarioAutenticablePorCorreo: jest.fn(),
     } as unknown as jest.Mocked<ConvivenciaService>;
 
-    jwtService = {
-      signAsync: jest.fn(),
-    } as unknown as jest.Mocked<JwtService>;
+    tokenSigner = {
+      sign: jest.fn(),
+    };
 
-    service = new AuthService(convivenciaService, jwtService);
+    service = new AuthService(convivenciaService, tokenSigner);
     bcryptCompareMock = bcrypt.compare as jest.MockedFunction<
       typeof bcrypt.compare
     >;
@@ -45,7 +45,7 @@ describe('AuthService', () => {
       passwordHash: 'hash_guardado',
     });
     bcryptCompareMock.mockResolvedValue(true as never);
-    jwtService.signAsync.mockResolvedValue('jwt-token-valido');
+    tokenSigner.sign.mockResolvedValue('jwt-token-valido');
 
     await expect(
       service.login({
@@ -62,7 +62,7 @@ describe('AuthService', () => {
       },
     });
 
-    expect(jwtService.signAsync.mock.calls).toEqual([
+    expect(tokenSigner.sign.mock.calls).toEqual([
       [
         {
           id: 'usr_1',
@@ -84,7 +84,7 @@ describe('AuthService', () => {
         correo: 'desconocido@colegio.edu',
         password: 'ClaveSegura123',
       }),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toThrow(InvalidCredentialsError);
   });
 
   it('lanza error cuando la contrasena no coincide', async () => {
@@ -103,6 +103,6 @@ describe('AuthService', () => {
         correo: 'docente@colegio.edu',
         password: 'ClaveIncorrecta123',
       }),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toThrow(InvalidCredentialsError);
   });
 });
