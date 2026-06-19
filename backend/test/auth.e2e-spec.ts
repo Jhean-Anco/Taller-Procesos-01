@@ -4,7 +4,6 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AplicacionModule } from './../src/aplicacion.module';
 import { configurarAplicacion } from './../src/configurar-aplicacion';
-import { ConvivenciaService } from './../src/contexts/convivencia/application/services/convivencia.service';
 import { Rol } from './../src/shared/domain/enums/rol.enum';
 
 interface RespuestaLoginE2E {
@@ -42,9 +41,12 @@ interface RespuestaSesionE2E {
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
-  let convivenciaService: ConvivenciaService;
 
   beforeEach(async () => {
+    process.env.BOOTSTRAP_ADMIN_EMAIL = 'admin@test.local';
+    process.env.BOOTSTRAP_ADMIN_PASSWORD = 'test-bootstrap-password';
+    process.env.BOOTSTRAP_PSYCHOLOGIST_EMAIL = 'psicologo@test.local';
+    process.env.BOOTSTRAP_PSYCHOLOGIST_PASSWORD = 'test-bootstrap-password';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AplicacionModule],
     }).compile();
@@ -52,25 +54,16 @@ describe('Auth (e2e)', () => {
     app = moduleFixture.createNestApplication();
     configurarAplicacion(app);
     await app.init();
-    convivenciaService = app.get(ConvivenciaService);
   });
 
   it('mantiene la sesion del usuario autenticado y permite cerrar sesion', async () => {
-    await convivenciaService.registrarUsuarioInstitucional({
-      nombre: 'Psicologia Escolar',
-      correo: 'psicologia@colegio.edu',
-      rol: Rol.PSICOLOGO,
-      area: 'Psicologia',
-      password: 'ClaveSegura123',
-    });
-
     const agente = request.agent(app.getHttpServer());
 
     const respuestaLogin = await agente
       .post('/api/v1/auth/login')
       .send({
-        correo: 'psicologia@colegio.edu',
-        password: 'ClaveSegura123',
+        correo: 'psicologo@test.local',
+        password: 'test-bootstrap-password',
       })
       .expect(201);
 
@@ -80,9 +73,8 @@ describe('Auth (e2e)', () => {
     expect(typeof bodyLogin.data.accessToken).toBe('string');
     expect(bodyLogin.data.accessToken.length).toBeGreaterThan(20);
     expect(bodyLogin.data.usuario).toMatchObject({
-      nombre: 'Psicologia Escolar',
-      correo: 'psicologia@colegio.edu',
-      rol: Rol.PSICOLOGO,
+      correo: 'psicologo@test.local',
+      rol: 'PSYCHOLOGIST',
     });
     expect(bodyLogin.meta.path).toBe('/api/v1/auth/login');
 
@@ -91,9 +83,8 @@ describe('Auth (e2e)', () => {
 
     expect(bodySesion.ok).toBe(true);
     expect(bodySesion.data.usuario).toMatchObject({
-      nombre: 'Psicologia Escolar',
-      correo: 'psicologia@colegio.edu',
-      rol: Rol.PSICOLOGO,
+      correo: 'psicologo@test.local',
+      rol: 'PSYCHOLOGIST',
     });
     expect(bodySesion.meta.path).toBe('/api/v1/auth/sesion');
 

@@ -21,6 +21,9 @@ export class InternalUserOrmEntity {
   @Column('boolean', { default: true })
   active!: boolean;
 
+  @Column('int', { name: 'token_version', default: 0 })
+  tokenVersion!: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

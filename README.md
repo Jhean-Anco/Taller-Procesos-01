@@ -50,6 +50,8 @@ AI_SERVICE_URL=http://127.0.0.1:8000/analyze
 AI_SERVICE_TIMEOUT_MS=7000
 AI_SERVICE_REQUIRED=false
 AI_INTERNAL_API_KEY=
+REPORTS_DATA_KEY=
+REPORTS_DATA_KEY_ID=2026-06
 PUBLIC_REPORT_RATE_LIMIT_WINDOW_MS=60000
 PUBLIC_REPORT_RATE_LIMIT_MAX=10
 REPORT_AI_QUEUE_CONCURRENCY=2
@@ -79,10 +81,10 @@ npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
-Usuarios seed en modo memoria:
+Bootstrap de administracion:
 
-- `psicologo@agora.edu.pe` / `psicolog2024`
-- `admin@agora.edu.pe` / `admin2024`
+- Define `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` y, si usas memoria, `BOOTSTRAP_PSYCHOLOGIST_EMAIL` / `BOOTSTRAP_PSYCHOLOGIST_PASSWORD`.
+- Para PostgreSQL, carga `backend/migrations/001_pmv_alertas_tempranas.sql` con `psql -v bootstrap_admin_email=... -v bootstrap_admin_password_hash=...` o usa un script de aprovisionamiento externo.
 
 ## Carga masiva manual
 
@@ -149,7 +151,7 @@ npm --prefix frontend run build
 - `DATABASE_SYNC=false` por defecto.
 - `SWAGGER_ENABLED=false` en production.
 - `AI_EXTERNAL_ALLOWED=false` y `GEMINI_ENABLED=false` por defecto.
-- `AI_INTERNAL_API_KEY` protege el intercambio entre backend y `ai-service`.
+- `AI_INTERNAL_API_KEY` y `REPORTS_DATA_KEY` son obligatorias en production.
 - `GET /api/v1/salud/db` valida la disponibilidad de PostgreSQL cuando la base esta habilitada.
 - `GET /api/v1/salud/ai` refleja el estado configurado del servicio IA.
 - Cada respuesta HTTP incluye `X-Request-Id` para trazabilidad.
@@ -178,4 +180,4 @@ HU-01 a HU-04 quedan cubiertas por `POST /anonymous-reports` y el frontend publi
 - Sustituir el baseline de reglas por un modelo entrenado y evaluado con dataset institucional anonimo.
 - Agregar cifrado de `message_text` con llave gestionada por entorno.
 - Persistir rate limiting en Redis para produccion.
-- Agregar migraciones TypeORM versionadas si se elimina el SQL manual.
+- Formalizar un aprovisionamiento externo para bootstrap de administradores y psicologos.

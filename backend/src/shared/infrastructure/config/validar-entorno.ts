@@ -51,6 +51,8 @@ export function validarEntorno(config: EntornoPlano): EntornoPlano {
     REPORT_AI_QUEUE_TICK_MS: config.REPORT_AI_QUEUE_TICK_MS ?? '500',
     REPORT_AI_QUEUE_MAX_RETRIES: config.REPORT_AI_QUEUE_MAX_RETRIES ?? '10',
     ANONYMITY_MIN_GROUP_SIZE: config.ANONYMITY_MIN_GROUP_SIZE ?? '3',
+    REPORTS_DATA_KEY: config.REPORTS_DATA_KEY,
+    REPORTS_DATA_KEY_ID: config.REPORTS_DATA_KEY_ID,
   };
 
   if (!entornosPermitidos.has(entornoValidado.NODE_ENV ?? '')) {
@@ -190,6 +192,12 @@ export function validarEntorno(config: EntornoPlano): EntornoPlano {
     }
     if ((entornoValidado.GEMINI_ENABLED ?? 'true') !== 'false') {
       errores.push('GEMINI_ENABLED debe ser false en production');
+    }
+    if (!entornoValidado.AI_INTERNAL_API_KEY) {
+      errores.push('AI_INTERNAL_API_KEY es obligatoria en production');
+    }
+    if (!entornoValidado.REPORTS_DATA_KEY) {
+      errores.push('REPORTS_DATA_KEY es obligatoria en production');
     }
   }
 

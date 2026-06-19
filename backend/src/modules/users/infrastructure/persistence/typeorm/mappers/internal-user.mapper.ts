@@ -10,6 +10,7 @@ export class InternalUserMapper {
       passwordHash: entity.passwordHash,
       role: entity.role,
       active: entity.active,
+      tokenVersion: entity.tokenVersion ?? 0,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     });
@@ -24,6 +25,7 @@ export class InternalUserMapper {
     entity.passwordHash = props.passwordHash;
     entity.role = props.role;
     entity.active = props.active;
+    entity.tokenVersion = props.tokenVersion ?? 0;
     entity.createdAt = props.createdAt;
     entity.updatedAt = props.updatedAt;
     return entity;

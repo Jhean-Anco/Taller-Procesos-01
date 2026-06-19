@@ -619,8 +619,8 @@ function PublicReport() {
 }
 
 function Login({ onLogin }: { onLogin: (session: Session) => void }) {
-  const [email, setEmail] = useState('psicologo@agora.edu.pe');
-  const [password, setPassword] = useState('psicolog2024');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const submit = async (event: FormEvent) => {
@@ -764,10 +764,13 @@ function PsychologistPanel({
   const remove = async () => {
     if (!detail) return;
     if (!window.confirm('¿Eliminar este reporte anónimo?')) return;
-    await api(`/psychologist/reports/${detail.id}`, token, {
-      method: 'DELETE',
+    const reason = window.prompt('Motivo del archivado');
+    if (!reason?.trim()) return;
+    await api(`/psychologist/reports/${detail.id}/archive`, token, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason: reason.trim() }),
     });
-    notify('El reporte fue eliminado.', 'warning');
+    notify('El reporte fue archivado.', 'warning');
     setDetail(null);
     await load();
   };

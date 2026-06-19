@@ -1,12 +1,14 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
+import { USERS_REPOSITORY, UsersRepository } from '../../../modules/users/domain/repositories/users.repository';
 import { RUTA_PUBLICA_CLAVE } from './ruta-publica.decorator';
 import { UsuarioAutenticado } from './usuario-autenticado.interface';
 
@@ -22,10 +24,10 @@ export class GuardiaAutenticacion implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
+    @Inject(USERS_REPOSITORY) private readonly usersRepository: UsersRepository,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    // Las rutas públicas quedan fuera del flujo de autenticación.
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const esRutaPublica = this.reflector.getAllAndOverride<boolean>(
       RUTA_PUBLICA_CLAVE,
       [context.getHandler(), context.getClass()],
@@ -38,9 +40,15 @@ export class GuardiaAutenticacion implements CanActivate {
     const request = context.switchToHttp().getRequest<RequestConUsuario>();
     const usuarioSesion = request.session?.usuario;
 
-    // Si existe una sesión HTTP activa, se reutiliza como fuente principal de identidad.
     if (usuarioSesion) {
-      request.usuario = usuarioSesion;
+      const usuarioActual = await this.usersRepository.findById(usuarioSesion.id);
+      if (!usuarioActual || !usuarioActual.active) {
+        throw new UnauthorizedException('El usuario ya no esta activo');
+      }
+      request.usuario = {
+        ...usuarioSesion,
+        tokenVersion: usuarioActual.tokenVersion,
+      };
       return true;
     }
 
@@ -55,9 +63,25 @@ export class GuardiaAutenticacion implements CanActivate {
     const token = authorization.replace('Bearer ', '').trim();
 
     try {
-      // Cuando no hay sesión, se permite autenticación stateless vía JWT.
-      const payload = this.jwtService.verify<UsuarioAutenticado>(token);
-      request.usuario = payload;
+      const payload = this.jwtService.verify<
+        UsuarioAutenticado & { tokenVersion?: number; jti?: string; sub?: string }
+      >(token);
+      const userId = payload.id ?? payload.sub ?? '';
+      const usuario = userId ? await this.usersRepository.findById(userId) : null;
+      if (!usuario || !usuario.active) {
+        throw new UnauthorizedException('El usuario ya no esta activo');
+      }
+      if ((payload.tokenVersion ?? 0) !== usuario.tokenVersion) {
+        throw new UnauthorizedException('La sesion fue revocada');
+      }
+      request.usuario = {
+        id: usuario.id,
+        nombre: usuario.name,
+        correo: usuario.email,
+        rol: usuario.role as unknown as UsuarioAutenticado['rol'],
+        tokenVersion: usuario.tokenVersion,
+        jti: payload.jti,
+      };
       return true;
     } catch {
       throw new UnauthorizedException('El token JWT es invalido o ha expirado');

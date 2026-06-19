@@ -5,4 +5,6 @@ export interface UsuarioAutenticado {
   nombre: string;
   correo: string;
   rol: Rol;
+  tokenVersion?: number;
+  jti?: string;
 }

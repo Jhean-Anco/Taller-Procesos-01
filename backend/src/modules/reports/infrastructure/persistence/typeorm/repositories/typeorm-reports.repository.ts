@@ -16,6 +16,7 @@ import { AiAnalysisOrmEntity } from '../entities/ai-analysis.orm-entity';
 import { AnonymousReportOrmEntity } from '../entities/anonymous-report.orm-entity';
 import { DerivationOrmEntity } from '../entities/derivation.orm-entity';
 import { PsychologicalReviewOrmEntity } from '../entities/psychological-review.orm-entity';
+import { ReportCryptoService } from '../../../../domain/services/report-crypto.service';
 
 @Injectable()
 export class TypeOrmReportsRepository implements ReportsRepository {
@@ -28,6 +29,7 @@ export class TypeOrmReportsRepository implements ReportsRepository {
     private readonly reviews: Repository<PsychologicalReviewOrmEntity>,
     @InjectRepository(DerivationOrmEntity)
     private readonly derivations: Repository<DerivationOrmEntity>,
+    private readonly crypto: ReportCryptoService,
   ) {}
 
   async createReport(report: AnonymousReport): Promise<AnonymousReport> {
@@ -143,18 +145,33 @@ export class TypeOrmReportsRepository implements ReportsRepository {
   }
 
   private reportToOrm(report: AnonymousReport): AnonymousReportOrmEntity {
-    return { ...report.toPrimitives() } as AnonymousReportOrmEntity;
+    const primitives = report.toPrimitives();
+    return {
+      ...primitives,
+      emotionalFormCiphertext: this.crypto.encrypt(JSON.stringify(primitives.emotionalForm ?? {})),
+      messageTextCiphertext: this.crypto.encrypt(primitives.messageText),
+      emotionalForm: undefined,
+      messageText: undefined,
+    } as AnonymousReportOrmEntity;
   }
 
   private reportToDomain(entity: AnonymousReportOrmEntity): AnonymousReport {
+    const emotionalForm = entity.emotionalFormCiphertext
+      ? JSON.parse(this.crypto.decrypt(entity.emotionalFormCiphertext))
+      : {};
+    const messageText = entity.messageTextCiphertext
+      ? this.crypto.decrypt(entity.messageTextCiphertext)
+      : '';
     return new AnonymousReport({
       id: entity.id,
       publicCode: entity.publicCode,
       gradeReference: entity.gradeReference,
       sectionReference: entity.sectionReference,
       ageRange: entity.ageRange,
-      emotionalForm: entity.emotionalForm,
-      messageText: entity.messageText,
+      emotionalForm,
+      messageText,
+      emotionalFormCiphertext: entity.emotionalFormCiphertext,
+      messageTextCiphertext: entity.messageTextCiphertext,
       consentAccepted: entity.consentAccepted,
       status: entity.status,
       analysisQueueStatus: entity.analysisQueueStatus,
@@ -237,13 +254,17 @@ export class TypeOrmReportsRepository implements ReportsRepository {
     }
 
     const page = Math.max(Number(filters?.page ?? 1) || 1, 1);
-    const limit = Math.min(Math.max(Number(filters?.limit ?? 50) || 50, 1), 100);
-    const [reports, total] = await this.reports.findAndCount({
+    const limitRaw = filters?.limit;
+    const limit =
+      typeof limitRaw === 'number' || typeof limitRaw === 'string'
+        ? Math.min(Math.max(Number(limitRaw) || 50, 1), 100)
+        : null;
+    const queryOptions = {
       where,
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+      order: { createdAt: 'DESC' } as const,
+      ...(limit ? { skip: (page - 1) * limit, take: limit } : {}),
+    };
+    const [reports, total] = await this.reports.findAndCount(queryOptions);
     return { reports, total };
   }
 }

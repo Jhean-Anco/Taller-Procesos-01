@@ -44,6 +44,7 @@ export class UsersUseCases {
       passwordHash: await this.passwordHasher.hash(dto.password),
       role: dto.role,
       active: true,
+      tokenVersion: 0,
       createdAt: now,
       updatedAt: now,
     });

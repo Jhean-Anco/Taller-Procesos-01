@@ -16,6 +16,10 @@ describe('PMV alertas tempranas (e2e)', () => {
   const aiServiceRequiredOriginal = process.env.AI_SERVICE_REQUIRED;
 
   beforeEach(async () => {
+    process.env.BOOTSTRAP_ADMIN_EMAIL = 'admin@test.local';
+    process.env.BOOTSTRAP_ADMIN_PASSWORD = 'test-bootstrap-password';
+    process.env.BOOTSTRAP_PSYCHOLOGIST_EMAIL = 'psicologo@test.local';
+    process.env.BOOTSTRAP_PSYCHOLOGIST_PASSWORD = 'test-bootstrap-password';
     process.env.AI_SERVICE_URL = 'http://127.0.0.1:1/analyze';
     process.env.AI_SERVICE_REQUIRED = 'false';
 
@@ -67,7 +71,7 @@ describe('PMV alertas tempranas (e2e)', () => {
 
     const psychologistLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ email: 'psicologo@agora.edu.pe', password: 'psicolog2024' })
+      .send({ email: 'psicologo@test.local', password: 'test-bootstrap-password' })
       .expect(201);
     const psychologistToken = (
       psychologistLogin.body as ApiResponse<{ accessToken: string }>
@@ -120,7 +124,7 @@ describe('PMV alertas tempranas (e2e)', () => {
 
     const adminLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ email: 'admin@agora.edu.pe', password: 'admin2024' })
+      .send({ email: 'admin@test.local', password: 'test-bootstrap-password' })
       .expect(201);
     const adminToken = (
       adminLogin.body as ApiResponse<{ accessToken: string }>
@@ -135,7 +139,7 @@ describe('PMV alertas tempranas (e2e)', () => {
         name: 'Usuario Prueba',
         email: createdEmail,
         password: createdPassword,
-        role: 'PSYCHOLOGIST',
+        role: 'ADMIN_DIRECTOR',
       })
       .expect(201);
     expect(
@@ -147,7 +151,7 @@ describe('PMV alertas tempranas (e2e)', () => {
       ).data,
     ).toMatchObject({
       email: createdEmail,
-      role: 'PSYCHOLOGIST',
+      role: 'ADMIN_DIRECTOR',
     });
 
     await request(app.getHttpServer())

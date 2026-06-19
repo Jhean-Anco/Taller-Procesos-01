@@ -12,6 +12,8 @@ export interface AnonymousReportProps {
   ageRange?: string | null;
   emotionalForm: Record<string, unknown>;
   messageText: string;
+  emotionalFormCiphertext?: string | null;
+  messageTextCiphertext?: string | null;
   consentAccepted: boolean;
   status: ReportStatus;
   analysisQueueStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
@@ -58,8 +60,16 @@ export class AnonymousReport {
     return { ...this.props.emotionalForm };
   }
 
+  get emotionalFormCiphertext(): string | null | undefined {
+    return this.props.emotionalFormCiphertext;
+  }
+
   get messageText(): string {
     return this.props.messageText;
+  }
+
+  get messageTextCiphertext(): string | null | undefined {
+    return this.props.messageTextCiphertext;
   }
 
   get consentAccepted(): boolean {

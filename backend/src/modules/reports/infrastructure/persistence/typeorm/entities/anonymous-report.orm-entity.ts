@@ -18,11 +18,11 @@ export class AnonymousReportOrmEntity {
   @Column('varchar', { name: 'age_range', length: 30, nullable: true })
   ageRange!: string | null;
 
-  @Column('jsonb', { name: 'emotional_form' })
-  emotionalForm!: Record<string, unknown>;
+  @Column('text', { name: 'emotional_form_ciphertext', nullable: true })
+  emotionalFormCiphertext!: string | null;
 
-  @Column('text', { name: 'message_text' })
-  messageText!: string;
+  @Column('text', { name: 'message_text_ciphertext', nullable: true })
+  messageTextCiphertext!: string | null;
 
   @Column('boolean', { name: 'consent_accepted' })
   consentAccepted!: boolean;

@@ -13,26 +13,40 @@ import {
 import { InternalUserRole } from '../../domain/enums';
 import { generarIdSeguro } from '../../domain/id-generator';
 
+function bootstrapHash(password: string | undefined): string {
+  if (!password) {
+    if (process.env.NODE_ENV === 'test') {
+      return bcrypt.hashSync('test-bootstrap-password', 10);
+    }
+    throw new Error('BOOTSTRAP_ADMIN_PASSWORD es obligatoria para la memoria institucional');
+  }
+  return bcrypt.hashSync(password, 10);
+}
+
 @Injectable()
 export class InstitutionalMemoryStore {
   readonly users: InternalUser[] = [
     new InternalUser({
       id: generarIdSeguro('usr'),
-      name: 'Administrador PMV',
-      email: 'admin@agora.edu.pe',
-      passwordHash: bcrypt.hashSync('admin2024', 10),
+      name: process.env.BOOTSTRAP_ADMIN_NAME ?? 'Administrador PMV',
+      email: process.env.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@localhost',
+      passwordHash: bootstrapHash(process.env.BOOTSTRAP_ADMIN_PASSWORD),
       role: InternalUserRole.ADMIN_DIRECTOR,
       active: true,
+      tokenVersion: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     }),
     new InternalUser({
       id: generarIdSeguro('usr'),
       name: 'Psicologia PMV',
-      email: 'psicologo@agora.edu.pe',
-      passwordHash: bcrypt.hashSync('psicolog2024', 10),
+      email: process.env.BOOTSTRAP_PSYCHOLOGIST_EMAIL ?? 'psicologo@localhost',
+      passwordHash: process.env.BOOTSTRAP_PSYCHOLOGIST_PASSWORD
+        ? bootstrapHash(process.env.BOOTSTRAP_PSYCHOLOGIST_PASSWORD)
+        : bcrypt.hashSync(process.env.NODE_ENV === 'test' ? 'test-bootstrap-password' : 'psicologo-bootstrap-password', 10),
       role: InternalUserRole.PSYCHOLOGIST,
       active: true,
+      tokenVersion: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     }),

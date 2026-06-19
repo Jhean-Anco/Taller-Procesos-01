@@ -5,6 +5,7 @@ import { ActivitiesModule } from './modules/activities/activities.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { UsersModule } from './modules/users/users.module';
 import { ModuloSalud } from './contexts/salud/infrastructure/salud.module';
 import { GuardiaAutenticacion } from './shared/infrastructure/auth/autenticacion.guard';
 import { GuardiaRoles } from './shared/infrastructure/auth/guardia-roles.guard';
@@ -23,6 +24,7 @@ import { TuberiaRecortarCadenas } from './shared/infrastructure/pipes/recortar-c
     }),
     ModuloBaseDatos.registrar(),
     AuthModule,
+    UsersModule,
     ReportsModule,
     ActivitiesModule,
     DashboardModule,

@@ -30,13 +30,29 @@ export class GuardiaRoles implements CanActivate {
 
     const request = context.switchToHttp().getRequest<PeticionConUsuario>();
     const usuario = request.usuario;
+    const rolUsuario = usuario?.rol;
 
-    if (!usuario || !rolesPermitidos.includes(usuario.rol)) {
+    if (!usuario || !this.esRolPermitido(rolUsuario, rolesPermitidos)) {
       throw new ForbiddenException(
         'No tienes permisos para acceder a este recurso',
       );
     }
 
     return true;
+  }
+
+  private esRolPermitido(rolUsuario: Rol | undefined, rolesPermitidos: Rol[]): boolean {
+    if (!rolUsuario) return false;
+    const equivalentes: Record<Rol, Rol[]> = {
+      [Rol.ADMIN]: [Rol.ADMIN, Rol.ADMIN_DIRECTOR],
+      [Rol.ADMIN_DIRECTOR]: [Rol.ADMIN_DIRECTOR, Rol.ADMIN],
+      [Rol.DOCENTE]: [Rol.DOCENTE],
+      [Rol.PSICOLOGO]: [Rol.PSICOLOGO],
+      [Rol.ADMINISTRATIVO]: [Rol.ADMINISTRATIVO],
+      [Rol.ESTUDIANTE]: [Rol.ESTUDIANTE],
+      [Rol.PSYCHOLOGIST]: [Rol.PSYCHOLOGIST],
+    };
+
+    return equivalentes[rolUsuario].some((rol) => rolesPermitidos.includes(rol));
   }
 }

@@ -7,6 +7,7 @@ export interface InternalUserProps {
   passwordHash: string;
   role: InternalUserRole;
   active: boolean;
+  tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,10 @@ export class InternalUser {
     return this.props.active;
   }
 
+  get tokenVersion(): number {
+    return this.props.tokenVersion;
+  }
+
   get createdAt(): Date {
     return this.props.createdAt;
   }
@@ -59,6 +64,7 @@ export class InternalUser {
     return new InternalUser({
       ...this.props,
       active,
+      tokenVersion: this.props.tokenVersion + 1,
       updatedAt: new Date(),
     });
   }

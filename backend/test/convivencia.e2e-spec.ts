@@ -61,6 +61,10 @@ describe('Convivencia (e2e)', () => {
   let iaService: IaService;
 
   beforeEach(async () => {
+    process.env.BOOTSTRAP_ADMIN_EMAIL = 'admin@test.local';
+    process.env.BOOTSTRAP_ADMIN_PASSWORD = 'test-bootstrap-password';
+    process.env.BOOTSTRAP_PSYCHOLOGIST_EMAIL = 'psicologo@test.local';
+    process.env.BOOTSTRAP_PSYCHOLOGIST_PASSWORD = 'test-bootstrap-password';
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AplicacionModule],
     }).compile();
@@ -84,8 +88,8 @@ describe('Convivencia (e2e)', () => {
     const agente = request.agent(app.getHttpServer());
 
     await agente.post('/api/v1/auth/login').send({
-      correo: 'psicologia@colegio.edu',
-      password: 'ClaveSegura123',
+      correo: 'admin@test.local',
+      password: 'test-bootstrap-password',
     });
 
     const analizarCriticidadSpy = jest
@@ -194,8 +198,8 @@ describe('Convivencia (e2e)', () => {
     const agente = request.agent(app.getHttpServer());
 
     await agente.post('/api/v1/auth/login').send({
-      correo: 'psicologia@colegio.edu',
-      password: 'ClaveSegura123',
+      correo: 'admin@test.local',
+      password: 'test-bootstrap-password',
     });
 
     jest.spyOn(iaService, 'analizarCriticidad').mockResolvedValue({

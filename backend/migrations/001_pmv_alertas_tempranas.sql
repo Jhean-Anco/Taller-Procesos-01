@@ -12,20 +12,20 @@ CREATE TABLE IF NOT EXISTS users (
 INSERT INTO users (id, name, email, password_hash, role, active, created_at, updated_at)
 VALUES
   (
-    'usr_seed_admin_agora',
-    'Administrador Agora',
-    'admin@agora.edu.pe',
-    '$2b$10$paSvJl9QWNi7RpbXRAyOWOUbCBZqc3L.O4QhhiEHdg1Vexx4TFD8q',
+    COALESCE(current_setting('app.bootstrap_admin_id', true), 'usr_seed_admin_agora'),
+    COALESCE(current_setting('app.bootstrap_admin_name', true), 'Administrador Agora'),
+    current_setting('app.bootstrap_admin_email', true),
+    current_setting('app.bootstrap_admin_password_hash', true),
     'ADMIN_DIRECTOR',
     TRUE,
     now(),
     now()
   ),
   (
-    'usr_seed_psicologo_agora',
-    'Psicologia Agora',
-    'psicologo@agora.edu.pe',
-    '$2b$10$4UbFKO5uw/lQ1UzawRRBxesnqORCAzmir0Msi4LjZnONhmaoefMIu',
+    COALESCE(current_setting('app.bootstrap_psychologist_id', true), 'usr_seed_psicologo_agora'),
+    COALESCE(current_setting('app.bootstrap_psychologist_name', true), 'Psicologia Agora'),
+    current_setting('app.bootstrap_psychologist_email', true),
+    current_setting('app.bootstrap_psychologist_password_hash', true),
     'PSYCHOLOGIST',
     TRUE,
     now(),
