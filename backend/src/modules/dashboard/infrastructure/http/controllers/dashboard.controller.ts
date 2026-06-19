@@ -19,7 +19,10 @@ export class DashboardController {
 
   @Get('summary')
   summary(@Req() request: RequestWithUser) {
-    return this.dashboardService.summary(request.usuario?.id ?? null, request.ip);
+    return this.dashboardService.summary(
+      request.usuario?.id ?? null,
+      request.ip,
+    );
   }
 
   @Get('risk-statistics')
