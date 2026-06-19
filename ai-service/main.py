@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import re
+import os
 import unicodedata
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 
 app = FastAPI(title="SafeSchool Local AI", version="2.0.0")
+INTERNAL_API_KEY = os.environ.get("AI_INTERNAL_API_KEY", "").strip()
 
 
 class AnalyzeRequest(BaseModel):
@@ -157,7 +159,11 @@ def health() -> dict[str, str]:
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
-def analyze(payload: AnalyzeRequest) -> AnalyzeResponse:
+async def analyze(request: Request, payload: AnalyzeRequest) -> AnalyzeResponse:
+    if INTERNAL_API_KEY:
+        header = request.headers.get("x-internal-api-key", "").strip()
+        if header != INTERNAL_API_KEY:
+            raise HTTPException(status_code=401, detail="invalid api key")
     text = normalize(payload.message)
     if not text:
         raise HTTPException(status_code=400, detail="message is required")
@@ -197,8 +203,9 @@ class LegacyRequest(BaseModel):
 
 
 @app.post("/api/evaluar_alerta")
-def legacy_analyze(payload: LegacyRequest) -> dict[str, Any]:
-    response = analyze(
+async def legacy_analyze(request: Request, payload: LegacyRequest) -> dict[str, Any]:
+    response = await analyze(
+        request,
         AnalyzeRequest(
             message=payload.frase_alumno,
             emotional_form={

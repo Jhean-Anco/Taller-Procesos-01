@@ -14,6 +14,8 @@ export interface ReportFilters {
   dominantEmotion?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  page?: number;
+  limit?: number;
 }
 
 export interface ReportAggregate {
@@ -29,10 +31,10 @@ export interface ReportsRepository {
   saveAnalysis(analysis: AiAnalysis): Promise<AiAnalysis>;
   saveReview(review: PsychologicalReview): Promise<PsychologicalReview>;
   saveDerivation(derivation: Derivation): Promise<Derivation>;
-  deleteReport(id: string): Promise<void>;
+  archiveReport(id: string, actorId: string, reason: string): Promise<AnonymousReport>;
   claimPendingAnalysisJobs(limit: number): Promise<AnonymousReport[]>;
   findById(id: string): Promise<ReportAggregate | null>;
   findByPublicCode(publicCode: string): Promise<ReportAggregate | null>;
   list(filters?: ReportFilters): Promise<ReportAggregate[]>;
-  count(): Promise<number>;
+  count(filters?: Omit<ReportFilters, 'page' | 'limit'>): Promise<number>;
 }

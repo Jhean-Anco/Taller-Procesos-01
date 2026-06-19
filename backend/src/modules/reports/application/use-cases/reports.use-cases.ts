@@ -79,9 +79,12 @@ export class ReportsUseCases {
 
   async listForPsychologist(filters?: ReportFilters) {
     const aggregates = await this.reportsRepository.list(filters);
-    return aggregates
+    const total = await this.reportsRepository.count(filters);
+    const sorted = aggregates
       .sort((a, b) => this.priority(b) - this.priority(a))
       .map((aggregate) => this.presenter.psychologistList(aggregate));
+
+    return this.paginate(sorted, filters, total);
   }
 
   async getForPsychologist(id: string, actor: InternalActor) {
@@ -181,26 +184,32 @@ export class ReportsUseCases {
     };
   }
 
-  async delete(id: string, actor: InternalActor) {
+  async archive(id: string, reason: string, actor: InternalActor) {
     await this.getAggregate(id);
-    await this.reportsRepository.deleteReport(id);
+    await this.reportsRepository.archiveReport(id, actor.id, reason);
     await this.auditService.register({
       actorUserId: actor.id,
-      action: 'DELETE_REPORT',
+      action: 'ARCHIVE_REPORT',
       entityType: 'anonymous_report',
       entityId: id,
+      metadata: { reason },
       ip: actor.ip,
     });
-    return { id, deleted: true };
+    return { id, archived: true };
   }
 
-  async listForAdminSafe() {
-    const aggregates = await this.reportsRepository.list();
-    return aggregates.map((aggregate) => this.presenter.adminSafeReport(aggregate));
+  async listForAdminSafe(filters?: ReportFilters) {
+    const aggregates = await this.reportsRepository.list(filters);
+    const total = await this.reportsRepository.count(filters);
+    const safe = aggregates.map((aggregate) => this.presenter.adminSafeReport(aggregate));
+    return this.paginate(safe, filters, total);
   }
 
   async getForAdmin(id: string) {
     const aggregate = await this.ensureAnalysisIfNeeded(await this.getAggregate(id));
+    if (aggregate.report.archivedAt || aggregate.report.archiveStatus === 'ARCHIVED') {
+      throw new BadRequestException('El reporte esta archivado');
+    }
     return this.presenter.adminDetailedReport(aggregate);
   }
 
@@ -330,5 +339,26 @@ export class ReportsUseCases {
   ) {
     const risk = aggregate.review?.validatedRisk ?? aggregate.analysis?.riskAi ?? RiskLevel.LOW;
     return { [RiskLevel.HIGH]: 3, [RiskLevel.MEDIUM]: 2, [RiskLevel.LOW]: 1 }[risk];
+  }
+
+  private paginate<T>(items: T[], filters?: ReportFilters, total?: number) {
+    const page = Math.max(Number(filters?.page ?? 1) || 1, 1);
+    const defaultLimit = items.length > 0 ? items.length : 1;
+    const limit = Math.min(
+      Math.max(Number(filters?.limit ?? defaultLimit) || defaultLimit, 1),
+      100,
+    );
+    if (!filters?.page && !filters?.limit) {
+      return items;
+    }
+    const safeTotal = Math.max(Number(total ?? items.length) || items.length, 0);
+    const totalPages = Math.max(Math.ceil(safeTotal / limit), 1);
+    return {
+      items,
+      page,
+      limit,
+      total: safeTotal,
+      totalPages,
+    };
   }
 }

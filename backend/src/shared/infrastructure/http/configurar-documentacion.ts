@@ -2,7 +2,10 @@ import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 export function configurarDocumentacion(app: INestApplication): void {
-  // Se documentan ambos mecanismos soportados por el backend: JWT y sesión HTTP.
+  if (process.env.SWAGGER_ENABLED === 'false') {
+    return;
+  }
+
   const documentoConfig = new DocumentBuilder()
     .setTitle('Backend de convivencia escolar')
     .setDescription(
@@ -19,7 +22,7 @@ export function configurarDocumentacion(app: INestApplication): void {
       'jwt',
     )
     .addCookieAuth(
-      'connect.sid',
+      'safeschool.sid',
       {
         type: 'apiKey',
         in: 'cookie',
@@ -31,10 +34,9 @@ export function configurarDocumentacion(app: INestApplication): void {
 
   const documento = SwaggerModule.createDocument(app, documentoConfig);
 
-  // Se publica una UI estable para desarrollo y validación manual del contrato HTTP.
   SwaggerModule.setup('api/docs', app, documento, {
     swaggerOptions: {
-      persistAuthorization: true,
+      persistAuthorization: process.env.NODE_ENV !== 'production',
     },
   });
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindOptionsWhere, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import {
@@ -56,8 +56,19 @@ export class TypeOrmReportsRepository implements ReportsRepository {
     return this.derivationToDomain(saved);
   }
 
-  async deleteReport(id: string): Promise<void> {
-    await this.reports.delete({ id });
+  async archiveReport(id: string, actorId: string, reason: string): Promise<AnonymousReport> {
+    const report = await this.reports.findOneBy({ id });
+    if (!report) {
+      throw new NotFoundException('Reporte anonimo no encontrado');
+    }
+
+    report.archiveStatus = 'ARCHIVED';
+    report.archivedAt = new Date();
+    report.archivedBy = actorId;
+    report.archiveReason = reason;
+    report.updatedAt = new Date();
+    const saved = await this.reports.save(report);
+    return this.reportToDomain(saved);
   }
 
   async claimPendingAnalysisJobs(limit: number): Promise<AnonymousReport[]> {
@@ -101,25 +112,20 @@ export class TypeOrmReportsRepository implements ReportsRepository {
   }
 
   async list(filters?: ReportFilters): Promise<ReportAggregate[]> {
-    const where: FindOptionsWhere<AnonymousReportOrmEntity> = {
-      ...(filters?.status ? { status: filters.status } : {}),
-    };
-    if (filters?.dateFrom && filters?.dateTo) {
-      where.createdAt = Between(filters.dateFrom, filters.dateTo);
-    } else if (filters?.dateFrom) {
-      where.createdAt = MoreThanOrEqual(filters.dateFrom);
-    } else if (filters?.dateTo) {
-      where.createdAt = LessThanOrEqual(filters.dateTo);
-    }
-    const reports = await this.reports.find({ where, order: { createdAt: 'DESC' } });
+    const { reports } = await this.findPagedReports(filters);
     const aggregates = await Promise.all(reports.map((report) => this.buildAggregate(report)));
-    return aggregates
-      .filter((item) => !filters?.risk || item.review?.validatedRisk === filters.risk || item.analysis?.riskAi === filters.risk)
-      .filter((item) => !filters?.dominantEmotion || item.analysis?.dominantEmotion === filters.dominantEmotion);
+    return aggregates.filter(
+      (item) =>
+        !filters?.risk ||
+        item.review?.validatedRisk === filters.risk ||
+        item.analysis?.riskAi === filters.risk,
+    ).filter(
+      (item) => !filters?.dominantEmotion || item.analysis?.dominantEmotion === filters.dominantEmotion,
+    );
   }
 
-  count(): Promise<number> {
-    return this.reports.count();
+  count(filters?: ReportFilters): Promise<number> {
+    return this.findPagedReports(filters).then(({ total }) => total);
   }
 
   private async buildAggregate(report: AnonymousReportOrmEntity): Promise<ReportAggregate> {
@@ -156,6 +162,10 @@ export class TypeOrmReportsRepository implements ReportsRepository {
       analysisNextAttemptAt: entity.analysisNextAttemptAt,
       analysisLastError: entity.analysisLastError,
       analysisRequestedAt: entity.analysisRequestedAt,
+      archivedAt: entity.archivedAt,
+      archivedBy: entity.archivedBy,
+      archiveReason: entity.archiveReason,
+      archiveStatus: entity.archiveStatus,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     });
@@ -208,5 +218,32 @@ export class TypeOrmReportsRepository implements ReportsRepository {
       status: entity.status,
       createdAt: entity.createdAt,
     });
+  }
+
+  private async findPagedReports(filters?: ReportFilters): Promise<{
+    reports: AnonymousReportOrmEntity[];
+    total: number;
+  }> {
+    const where: FindOptionsWhere<AnonymousReportOrmEntity> = {
+      ...(filters?.status ? { status: filters.status } : {}),
+      archiveStatus: 'ACTIVE',
+    };
+    if (filters?.dateFrom && filters?.dateTo) {
+      where.createdAt = Between(filters.dateFrom, filters.dateTo);
+    } else if (filters?.dateFrom) {
+      where.createdAt = MoreThanOrEqual(filters.dateFrom);
+    } else if (filters?.dateTo) {
+      where.createdAt = LessThanOrEqual(filters.dateTo);
+    }
+
+    const page = Math.max(Number(filters?.page ?? 1) || 1, 1);
+    const limit = Math.min(Math.max(Number(filters?.limit ?? 50) || 50, 1), 100);
+    const [reports, total] = await this.reports.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return { reports, total };
   }
 }

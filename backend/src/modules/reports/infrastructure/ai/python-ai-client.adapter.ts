@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { RiskLevel } from '../../../shared/domain/enums';
+import { TextPrivacyService } from '../../domain/services/text-privacy.service';
 import {
   AiAnalyzerPort,
   AiAnalysisInput,
@@ -43,10 +44,15 @@ interface GeminiAnalysisPayload {
 
 @Injectable()
 export class PythonAiClientAdapter implements AiAnalyzerPort {
+  private readonly privacy = new TextPrivacyService();
   private readonly serviceUrl =
     process.env.AI_SERVICE_URL ?? 'http://127.0.0.1:8000/analyze';
-  private readonly timeoutMs = Number(process.env.AI_SERVICE_TIMEOUT_MS ?? 7000);
+  private readonly timeoutMs = Number(
+    process.env.AI_SERVICE_TIMEOUT_MS ?? 7000,
+  );
   private readonly required = process.env.AI_SERVICE_REQUIRED === 'true';
+  private readonly internalApiKey =
+    this.readConfigValue(['AI_INTERNAL_API_KEY']) ?? '';
   private readonly geminiApiKey = this.readConfigValue([
     'GEMINI_API_KEY',
     'GOOGLE_API_KEY',
@@ -60,15 +66,22 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
   private readonly geminiUrl =
     this.readConfigValue(['GEMINI_API_URL', 'GOOGLE_AI_API_URL']) ??
     'https://generativelanguage.googleapis.com/v1beta';
-  private readonly geminiEnabledConfig = this.readConfigValue(['GEMINI_ENABLED']);
-  private readonly geminiEnabled = this.geminiEnabledConfig
-    ? this.geminiEnabledConfig !== 'false'
-    : process.env.NODE_ENV !== 'test';
+  private readonly aiExternalAllowed =
+    (this.readConfigValue(['AI_EXTERNAL_ALLOWED']) ?? 'false') === 'true';
+  private readonly geminiEnabled =
+    (this.readConfigValue(['GEMINI_ENABLED']) ?? 'false') === 'true';
+  private readonly externalAiConsentRequired =
+    (this.readConfigValue(['EXTERNAL_AI_CONSENT_REQUIRED']) ?? 'true') === 'true';
   private readonly geminiRequired =
     (this.readConfigValue(['GEMINI_REQUIRED']) ?? 'false') === 'true';
 
   async analyze(input: AiAnalysisInput): Promise<AiAnalysisResult> {
-    if (this.geminiEnabled && this.geminiApiKey) {
+    if (
+      this.aiExternalAllowed &&
+      this.externalAiConsentRequired &&
+      this.geminiEnabled &&
+      this.geminiApiKey
+    ) {
       try {
         return await this.analyzeWithGemini(input);
       } catch (error) {
@@ -86,7 +99,10 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
     try {
       const response = await fetch(this.serviceUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.internalApiKey ? { 'x-internal-api-key': this.internalApiKey } : {}),
+        },
         body: JSON.stringify({
           message: input.message,
           emotional_form: input.emotionalForm,
@@ -125,7 +141,9 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
     }
   }
 
-  private async analyzeWithGemini(input: AiAnalysisInput): Promise<AiAnalysisResult> {
+  private async analyzeWithGemini(
+    input: AiAnalysisInput,
+  ): Promise<AiAnalysisResult> {
     let lastError: unknown;
     for (const model of this.geminiModels) {
       try {
@@ -138,7 +156,9 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error('Gemini no disponible');
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Gemini no disponible');
   }
 
   private async analyzeWithGeminiModel(
@@ -155,6 +175,7 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
         headers: {
           'Content-Type': 'application/json',
           'x-goog-api-key': this.geminiApiKey!,
+          ...(this.internalApiKey ? { 'x-internal-api-key': this.internalApiKey } : {}),
         },
         body: JSON.stringify({
           contents: [
@@ -193,7 +214,10 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
         throw new Error('Gemini respondio sin contenido');
       }
 
-      return this.normalizeGeminiAnalysis(this.parseGeminiJson(text), modelName);
+      return this.normalizeGeminiAnalysis(
+        this.parseGeminiJson(text),
+        modelName,
+      );
     } finally {
       clearTimeout(timer);
     }
@@ -205,6 +229,10 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
   }
 
   private buildGeminiPrompt(input: AiAnalysisInput): string {
+    const sanitizedMessage = this.privacy.buildNonSensitiveSummary(input.message, 1200);
+    const sanitizedForm = this.privacy.sanitizeSignals(
+      Object.entries(input.emotionalForm).map(([key, value]) => `${key}:${String(value)}`),
+    );
     return [
       'Eres un asistente de convivencia escolar. Analiza un reporte anonimo de estudiante.',
       'No diagnostiques. No inventes identidades. No pidas datos personales. Prioriza seguridad, bienestar y revision humana.',
@@ -212,8 +240,8 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       '{"dominant_emotion":"fear|sadness|anxiety|anger|neutral|uncertain","emotion_scores":{"fear":0,"sadness":0,"anxiety":0,"anger":0,"neutral":0},"risk_ai":"LOW|MEDIUM|HIGH","confidence":0.0,"relevant_signals":["..."],"explanation":"...","recommended_action":"...","context_summary":"..."}',
       'Criterios: HIGH solo si hay amenaza, violencia, abuso, autolesion, arma, golpe serio o peligro inmediato. MEDIUM si hay acoso, aislamiento, miedo, tristeza o ansiedad recurrente sin peligro inmediato. LOW si son molestias leves, orientacion general o malestar puntual.',
       'La explicacion y la recomendacion deben ser especificas del texto; evita frases genericas repetidas por nivel.',
-      `Formulario emocional JSON: ${JSON.stringify(input.emotionalForm)}`,
-      `Reporte anonimo: ${input.message}`,
+      `Formulario emocional resumido: ${JSON.stringify(sanitizedForm)}`,
+      `Reporte anonimo resumido: ${sanitizedMessage}`,
     ].join('\n');
   }
 
@@ -229,7 +257,9 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       const start = cleaned.indexOf('{');
       const end = cleaned.lastIndexOf('}');
       if (start >= 0 && end > start) {
-        return JSON.parse(cleaned.slice(start, end + 1)) as GeminiAnalysisPayload;
+        return JSON.parse(
+          cleaned.slice(start, end + 1),
+        ) as GeminiAnalysisPayload;
       }
       throw new Error('Gemini no devolvio JSON valido');
     }
@@ -241,7 +271,10 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
   ): AiAnalysisResult {
     const riskAi = this.normalizeRisk(payload.risk_ai);
     const emotionScores = this.normalizeScores(payload.emotion_scores);
-    const dominantEmotion = this.normalizeEmotion(payload.dominant_emotion, emotionScores);
+    const dominantEmotion = this.normalizeEmotion(
+      payload.dominant_emotion,
+      emotionScores,
+    );
     const relevantSignals = [
       ...this.normalizeSignals(payload.relevant_signals),
       ...this.metadataSignals(payload),
@@ -261,8 +294,12 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
   private metadataSignals(payload: GeminiAnalysisPayload): string[] {
     return [
       payload.explanation ? `explicacion::${payload.explanation.trim()}` : null,
-      payload.recommended_action ? `accion::${payload.recommended_action.trim()}` : null,
-      payload.context_summary ? `resumen::${payload.context_summary.trim()}` : null,
+      payload.recommended_action
+        ? `accion::${payload.recommended_action.trim()}`
+        : null,
+      payload.context_summary
+        ? `resumen::${payload.context_summary.trim()}`
+        : null,
     ].filter((item): item is string => Boolean(item));
   }
 
@@ -290,18 +327,34 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
   }
 
   private normalizeRisk(risk?: string): RiskLevel {
-    if (risk === RiskLevel.HIGH || risk === RiskLevel.MEDIUM || risk === RiskLevel.LOW) {
+    if (
+      risk === RiskLevel.HIGH ||
+      risk === RiskLevel.MEDIUM ||
+      risk === RiskLevel.LOW
+    ) {
       return risk;
     }
     return RiskLevel.LOW;
   }
 
-  private normalizeEmotion(emotion: string | undefined, scores: Record<string, number>) {
-    const allowed = ['fear', 'sadness', 'anxiety', 'anger', 'neutral', 'uncertain'];
+  private normalizeEmotion(
+    emotion: string | undefined,
+    scores: Record<string, number>,
+  ) {
+    const allowed = [
+      'fear',
+      'sadness',
+      'anxiety',
+      'anger',
+      'neutral',
+      'uncertain',
+    ];
     if (emotion && allowed.includes(emotion)) {
       return emotion;
     }
-    return Object.entries(scores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'uncertain';
+    return (
+      Object.entries(scores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'uncertain'
+    );
   }
 
   private clampNumber(value: unknown, min: number, max: number) {
@@ -320,7 +373,10 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       }
     }
 
-    for (const file of [join(process.cwd(), '.env'), join(process.cwd(), '..', '.env')]) {
+    for (const file of [
+      join(process.cwd(), '.env'),
+      join(process.cwd(), '..', '.env'),
+    ]) {
       if (!existsSync(file)) {
         continue;
       }
@@ -344,7 +400,10 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
         .map((line) => {
           const index = line.indexOf('=');
           const key = line.slice(0, index).trim();
-          const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, '');
+          const value = line
+            .slice(index + 1)
+            .trim()
+            .replace(/^['"]|['"]$/g, '');
           return [key, value];
         }),
     );
@@ -360,7 +419,9 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       ...(configuredFallbacks ?? ['gemini-3-flash-preview']),
     ];
 
-    return models.filter((model, index) => model && models.indexOf(model) === index);
+    return models.filter(
+      (model, index) => model && models.indexOf(model) === index,
+    );
   }
 
   private localSafeFallback(input: AiAnalysisInput): AiAnalysisResult {
@@ -368,10 +429,26 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
-    const highTerms = ['matarme', 'suicidio', 'no quiero vivir', 'amenaza', 'golpe', 'abuso'];
-    const mediumTerms = ['miedo', 'triste', 'ansiedad', 'solo', 'burlan', 'insultan'];
+    const highTerms = [
+      'matarme',
+      'suicidio',
+      'no quiero vivir',
+      'amenaza',
+      'golpe',
+      'abuso',
+    ];
+    const mediumTerms = [
+      'miedo',
+      'triste',
+      'ansiedad',
+      'solo',
+      'burlan',
+      'insultan',
+    ];
     const highMatches = highTerms.filter((term) => text.includes(term)).length;
-    const mediumMatches = mediumTerms.filter((term) => text.includes(term)).length;
+    const mediumMatches = mediumTerms.filter((term) =>
+      text.includes(term),
+    ).length;
     const riskFormKeys = [
       'fear',
       'miedo',
@@ -401,25 +478,43 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
       riskPoints += 0.4;
     }
     const riskAi =
-      highMatches >= 1 || riskPoints >= 6.5 || (maxScore >= 0.9 && formRisk >= 4)
+      highMatches >= 1 ||
+      riskPoints >= 6.5 ||
+      (maxScore >= 0.9 && formRisk >= 4)
         ? RiskLevel.HIGH
-        : riskPoints >= 2.7 || (mediumMatches >= 2 && formRisk >= 1) || maxScore >= 0.65
+        : riskPoints >= 2.7 ||
+            (mediumMatches >= 2 && formRisk >= 1) ||
+            maxScore >= 0.65
           ? RiskLevel.MEDIUM
           : RiskLevel.LOW;
     const relevantSignals = [...highTerms, ...mediumTerms]
-      .filter((term, index, terms) => text.includes(term) && terms.indexOf(term) === index)
+      .filter(
+        (term, index, terms) =>
+          text.includes(term) && terms.indexOf(term) === index,
+      )
       .slice(0, 8);
     return {
       dominantEmotion: mediumMatches > 0 || formRisk > 0 ? 'fear' : 'neutral',
       emotionScores: {
         fear: maxScore,
-        sadness: Math.min(0.75, 0.12 + (text.includes('triste') || text.includes('solo') ? 0.28 : 0)),
-        anxiety: Math.min(0.75, 0.12 + (text.includes('ansiedad') || formRisk > 1 ? 0.3 : 0)),
+        sadness: Math.min(
+          0.75,
+          0.12 + (text.includes('triste') || text.includes('solo') ? 0.28 : 0),
+        ),
+        anxiety: Math.min(
+          0.75,
+          0.12 + (text.includes('ansiedad') || formRisk > 1 ? 0.3 : 0),
+        ),
         anger: Math.min(0.75, 0.1 + (highMatches > 0 ? 0.34 : 0)),
       },
       riskAi,
       confidence: 0.35,
-      relevantSignals: this.enrichLocalSignals(input, riskAi, relevantSignals, true),
+      relevantSignals: this.enrichLocalSignals(
+        input,
+        riskAi,
+        relevantSignals,
+        true,
+      ),
       modelVersion: 'typescript-safety-fallback',
       preliminary: true,
     };
@@ -481,7 +576,11 @@ export class PythonAiClientAdapter implements AiAnalyzerPort {
           ? 'Programar seguimiento psicologico y observar el contexto reportado.'
           : 'Registrar el caso y ofrecer orientacion preventiva.';
     const summary = input.message.trim().slice(0, 180);
-    return [`explicacion::${explanation}`, `accion::${action}`, `resumen::${summary}`];
+    return [
+      `explicacion::${explanation}`,
+      `accion::${action}`,
+      `resumen::${summary}`,
+    ];
   }
 
   private describeFormSignals(form: Record<string, unknown>) {

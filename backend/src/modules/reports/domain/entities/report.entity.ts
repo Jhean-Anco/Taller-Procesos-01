@@ -19,6 +19,10 @@ export interface AnonymousReportProps {
   analysisNextAttemptAt?: Date | null;
   analysisLastError?: string | null;
   analysisRequestedAt?: Date;
+  archivedAt?: Date | null;
+  archivedBy?: string | null;
+  archiveReason?: string | null;
+  archiveStatus?: 'ACTIVE' | 'ARCHIVED';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -86,6 +90,22 @@ export class AnonymousReport {
     return this.props.analysisRequestedAt;
   }
 
+  get archivedAt(): Date | null | undefined {
+    return this.props.archivedAt;
+  }
+
+  get archivedBy(): string | null | undefined {
+    return this.props.archivedBy;
+  }
+
+  get archiveReason(): string | null | undefined {
+    return this.props.archiveReason;
+  }
+
+  get archiveStatus(): 'ACTIVE' | 'ARCHIVED' | undefined {
+    return this.props.archiveStatus;
+  }
+
   get createdAt(): Date {
     return this.props.createdAt;
   }
@@ -118,6 +138,17 @@ export class AnonymousReport {
       analysisQueueStatus: 'COMPLETED',
       analysisNextAttemptAt: null,
       analysisLastError: null,
+      updatedAt: new Date(),
+    });
+  }
+
+  archive(actorId: string, reason: string): AnonymousReport {
+    return new AnonymousReport({
+      ...this.props,
+      archiveStatus: 'ARCHIVED',
+      archivedAt: new Date(),
+      archivedBy: actorId,
+      archiveReason: reason,
       updatedAt: new Date(),
     });
   }

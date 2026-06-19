@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ActivitiesService } from '../../../activities/application/use-cases/activities.service';
 import { AlertsService } from '../../../alerts/application/use-cases/alerts.service';
+import { AuditService } from '../../../audit/application/use-cases/audit.service';
 import { RiskLevel } from '../../../shared/domain/enums';
 import {
   REPORTS_REPOSITORY,
@@ -19,15 +20,16 @@ export class DashboardService {
     private readonly reportsRepository: ReportsRepository,
     private readonly alertsService: AlertsService,
     private readonly activitiesService: ActivitiesService,
+    private readonly auditService: AuditService,
   ) {}
 
-  async summary() {
+  async summary(actorUserId?: string | null, ip?: string | null) {
     const [reports, alertsByStatus, activities] = await Promise.all([
       this.reportsRepository.list(),
       this.alertsService.countByStatus(),
       this.activitiesService.count(),
     ]);
-    return {
+    const summary = {
       reports_received: reports.length,
       alerts_generated: Object.values(alertsByStatus).reduce((sum, count) => sum + count, 0),
       cases_addressed: reports.filter((item) => item.report.status === 'ADDRESSED').length,
@@ -38,6 +40,19 @@ export class DashboardService {
       ).length,
       ai_pending_reports: reports.filter((item) => !item.analysis).length,
     };
+    await this.auditService.register({
+      actorUserId,
+      action: 'ADMIN_SUMMARY_VIEWED',
+      entityType: 'dashboard',
+      entityId: 'summary',
+      metadata: {
+        reports_received: summary.reports_received,
+        alerts_generated: summary.alerts_generated,
+        ai_pending_reports: summary.ai_pending_reports,
+      },
+      ip,
+    });
+    return summary;
   }
 
   async riskStatistics() {

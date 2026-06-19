@@ -61,6 +61,17 @@ export class ReportFiltersDto {
   @IsOptional()
   @IsDateString()
   date_to?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }
 
 export class ReviewReportDto {
@@ -95,4 +106,11 @@ export class ProcessAnalysisQueueDto {
   @Min(1)
   @Max(50)
   limit?: number;
+}
+
+export class ArchiveReportDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(500)
+  reason!: string;
 }

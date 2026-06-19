@@ -1,21 +1,36 @@
 import { INestApplication, VersioningType } from '@nestjs/common';
-import type { Express } from 'express';
+import type { Express, NextFunction, Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import { randomUUID } from 'node:crypto';
 import { RUTAS_API } from './shared/infrastructure/http/rutas-api.constantes';
 
 export function configurarAplicacion(app: INestApplication): void {
   const appHttp: Express = app.getHttpAdapter().getInstance() as Express;
+  const esTest = process.env.NODE_ENV === 'test';
   appHttp.set('trust proxy', 1);
   app.use(cookieParser());
+  app.use((_: Request, response: Response, next: NextFunction) => {
+    response.setHeader('X-Request-Id', randomUUID());
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader('Referrer-Policy', 'no-referrer');
+    response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    response.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self';",
+    );
+    next();
+  });
   app.use(
     session({
-      secret: process.env.SESSION_SECRET ?? 'session-secret-dev',
+      secret: process.env.SESSION_SECRET ?? (esTest ? 'test-session-secret' : ''),
       resave: false,
       saveUninitialized: false,
+      name: 'safeschool.sid',
       cookie: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'strict',
         secure: process.env.NODE_ENV === 'production',
         maxAge: 1000 * 60 * 60 * 8,
       },

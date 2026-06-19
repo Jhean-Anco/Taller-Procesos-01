@@ -6,13 +6,16 @@ import { RespuestaIa } from '../../../domain/entities/respuesta-ia.entidad';
 export class AdaptadorProveedorIaLocal implements PuertoProveedorIa {
   generarTexto(prompt: string): Promise<RespuestaIa> {
     const texto = prompt.toLowerCase();
-    const nivelAlerta = texto.includes('suicidio') || texto.includes('abuso')
-      ? 'critica'
-      : texto.includes('golpe') || texto.includes('amenaza')
-        ? 'alta'
-        : texto.includes('miedo') || texto.includes('burla') || texto.includes('aislamiento')
-          ? 'media'
-          : 'baja';
+    const nivelAlerta =
+      texto.includes('suicidio') || texto.includes('abuso')
+        ? 'critica'
+        : texto.includes('golpe') || texto.includes('amenaza')
+          ? 'alta'
+          : texto.includes('miedo') ||
+              texto.includes('burla') ||
+              texto.includes('aislamiento')
+            ? 'media'
+            : 'baja';
     const contenido = JSON.stringify({
       nivelAlerta,
       alertaCritica: nivelAlerta === 'critica',

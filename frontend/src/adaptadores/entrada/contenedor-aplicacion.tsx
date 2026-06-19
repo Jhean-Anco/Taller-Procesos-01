@@ -72,7 +72,6 @@ export function ContenedorAplicacion() {
       }
     } catch (errorCapturado) {
       if (errorCapturado instanceof Error && errorCapturado.message.includes('401')) {
-        localStorage.removeItem('safeschool_token');
         sesionLocal.limpiar();
         setSesion(null);
       }
@@ -88,7 +87,7 @@ export function ContenedorAplicacion() {
 
   useEffect(() => {
     if (sesion?.tokenAcceso) {
-      localStorage.setItem('safeschool_token', sesion.tokenAcceso);
+      sesionLocal.guardar(sesion);
     }
   }, [sesion]);
 
@@ -104,7 +103,6 @@ export function ContenedorAplicacion() {
     setError('');
     try {
       const sesionNueva = await iniciarSesion.ejecutar(credenciales);
-      localStorage.setItem('safeschool_token', sesionNueva.tokenAcceso);
       sesionLocal.guardar(sesionNueva);
       setSesion(sesionNueva);
       setMostrarAccesoInterno(false);
@@ -125,7 +123,6 @@ export function ContenedorAplicacion() {
   };
 
   const cerrarSesion = () => {
-    localStorage.removeItem('safeschool_token');
     sesionLocal.limpiar();
     setSesion(null);
     setPanel(null);

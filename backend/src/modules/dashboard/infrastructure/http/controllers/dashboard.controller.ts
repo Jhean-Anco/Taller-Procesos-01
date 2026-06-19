@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { Rol } from '../../../../../shared/domain/enums/rol.enum';
 import { ProtegerRuta } from '../../../../../shared/infrastructure/auth/proteger-ruta.decorator';
@@ -18,8 +18,8 @@ export class DashboardController {
   ) {}
 
   @Get('summary')
-  summary() {
-    return this.dashboardService.summary();
+  summary(@Req() request: RequestWithUser) {
+    return this.dashboardService.summary(request.usuario?.id ?? null, request.ip);
   }
 
   @Get('risk-statistics')
@@ -48,8 +48,11 @@ export class DashboardController {
   }
 
   @Get('reports')
-  reports() {
-    return this.reportsUseCases.listForAdminSafe();
+  reports(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.reportsUseCases.listForAdminSafe({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get('reports/:id')

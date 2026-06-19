@@ -179,16 +179,6 @@ export class ReportPresenter {
   adminDetailedReport(aggregate: ReportAggregate) {
     return {
       ...this.adminSafeReport(aggregate),
-      message_text: aggregate.report.messageText,
-      emotional_form: aggregate.report.emotionalForm,
-      ai_analysis: this.buildAiAnalysis(aggregate),
-      psychological_review: aggregate.review
-        ? {
-            validated_risk: aggregate.review.validatedRisk,
-            observation_internal: aggregate.review.observationInternal,
-            reviewed_at: aggregate.review.reviewedAt.toISOString(),
-          }
-        : null,
       derivation: aggregate.derivation
         ? {
             non_sensitive_summary: aggregate.derivation.nonSensitiveSummary,
@@ -197,6 +187,7 @@ export class ReportPresenter {
             admin_director_id: aggregate.derivation.adminDirectorId,
           }
         : null,
+      ai_analysis: this.buildAiAnalysis(aggregate),
       analysis_queue: {
         status: aggregate.report.analysisQueueStatus ?? 'PENDING',
         attempts: aggregate.report.analysisAttempts ?? 0,
@@ -207,6 +198,9 @@ export class ReportPresenter {
         requested_at: aggregate.report.analysisRequestedAt
           ? aggregate.report.analysisRequestedAt.toISOString()
           : null,
+      },
+      sensitive_data: {
+        available_only_for_psychologist: true,
       },
     };
   }

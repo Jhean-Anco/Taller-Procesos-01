@@ -24,12 +24,14 @@ export class ModuloBaseDatos {
                 password: configService.get<string>('DATABASE_PASSWORD'),
                 database: configService.get<string>('DATABASE_NAME'),
                 autoLoadEntities: true,
-                synchronize:
-                  configService.get<string>('DATABASE_SYNC') === 'true',
+                synchronize: configService.get<string>('DATABASE_SYNC') === 'true',
                 ssl:
                   configService.get<string>('DATABASE_SSL') === 'true'
                     ? { rejectUnauthorized: false }
                     : false,
+                extra: {
+                  application_name: configService.get<string>('APP_NAME') ?? 'backend',
+                },
               }),
             }),
           ]

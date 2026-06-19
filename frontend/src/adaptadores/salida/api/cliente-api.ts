@@ -23,8 +23,7 @@ export class ClienteApi implements ClienteApiPuerto {
 
   private async solicitar<T>(ruta: string, opciones?: RequestInit): Promise<T> {
     const sesionPersistida = this.sesionLocal.obtener();
-    const token =
-      localStorage.getItem('safeschool_token') ?? sesionPersistida?.tokenAcceso ?? null;
+    const token = sesionPersistida?.tokenAcceso ?? null;
     const encabezadosBase: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

@@ -1,8 +1,19 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { generarIdSeguro } from '../../../shared/domain/id-generator';
 import { InternalUser } from '../../domain/entities/internal-user.entity';
-import { USERS_REPOSITORY, UsersRepository } from '../../domain/repositories/users.repository';
-import { PASSWORD_HASHER, PasswordHasherPort } from '../ports/password-hasher.port';
+import {
+  USERS_REPOSITORY,
+  UsersRepository,
+} from '../../domain/repositories/users.repository';
+import {
+  PASSWORD_HASHER,
+  PasswordHasherPort,
+} from '../ports/password-hasher.port';
 import {
   CreateInternalUserDto,
   InternalUserResponseDto,
@@ -45,7 +56,10 @@ export class UsersUseCases {
     return users.map((user) => this.present(user));
   }
 
-  async update(id: string, dto: UpdateInternalUserDto): Promise<InternalUserResponseDto> {
+  async update(
+    id: string,
+    dto: UpdateInternalUserDto,
+  ): Promise<InternalUserResponseDto> {
     const current = await this.usersRepository.findById(id);
     if (!current) {
       throw new NotFoundException('Usuario interno no encontrado');
@@ -61,13 +75,18 @@ export class UsersUseCases {
     return this.present(await this.usersRepository.save(current.update(dto)));
   }
 
-  async changeStatus(id: string, active: boolean): Promise<InternalUserResponseDto> {
+  async changeStatus(
+    id: string,
+    active: boolean,
+  ): Promise<InternalUserResponseDto> {
     const current = await this.usersRepository.findById(id);
     if (!current) {
       throw new NotFoundException('Usuario interno no encontrado');
     }
 
-    return this.present(await this.usersRepository.save(current.changeStatus(active)));
+    return this.present(
+      await this.usersRepository.save(current.changeStatus(active)),
+    );
   }
 
   private present(user: InternalUser): InternalUserResponseDto {

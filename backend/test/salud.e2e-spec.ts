@@ -47,6 +47,34 @@ describe('Salud (e2e)', () => {
       });
   });
 
+  it('/api/v1/salud/db (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/salud/db')
+      .expect(200)
+      .expect((response) => {
+        const body = response.body as RespuestaSaludE2E;
+
+        expect(body.ok).toBe(true);
+        expect(['postgres', 'database-disabled']).toContain(body.data.service);
+        expect(['ok', 'unavailable']).toContain(body.data.status);
+        expect(body.meta.path).toBe('/api/v1/salud/db');
+      });
+  });
+
+  it('/api/v1/salud/ai (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/salud/ai')
+      .expect(200)
+      .expect((response) => {
+        const body = response.body as RespuestaSaludE2E;
+
+        expect(body.ok).toBe(true);
+        expect(body.data.status).toMatch(/configured|required/);
+        expect(typeof body.data.service).toBe('string');
+        expect(body.meta.path).toBe('/api/v1/salud/ai');
+      });
+  });
+
   afterEach(async () => {
     await app.close();
   });

@@ -25,7 +25,9 @@ import { JwtTokenSignerAdapter } from './infrastructure/security/jwt-token-signe
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret:
+          configService.get<string>('JWT_SECRET') ??
+          (process.env.NODE_ENV === 'test' ? 'test-jwt-secret' : ''),
         signOptions: {
           expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ?? '8h') as StringValue,
         },

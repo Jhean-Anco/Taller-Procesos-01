@@ -201,15 +201,17 @@ describe('PMV alertas tempranas (e2e)', () => {
     expect(
       adminReportDetailResponse.body as ApiResponse<{
         public_code: string;
-        message_text: string;
-        emotional_form: Record<string, unknown>;
+        summary: string;
+        sensitive_data: { available_only_for_psychologist: boolean };
         analysis_queue: { status: string; attempts: number };
       }>,
     ).toMatchObject({
       data: {
         public_code: expect.any(String),
-        message_text: expect.any(String),
-        emotional_form: expect.any(Object),
+        summary: expect.any(String),
+        sensitive_data: {
+          available_only_for_psychologist: true,
+        },
         analysis_queue: {
           status: expect.any(String),
           attempts: expect.any(Number),

@@ -43,7 +43,6 @@ interface AiAnalysisDetail {
 }
 
 interface ReportDetail extends ReportListItem {
-  emotional_form: Record<string, unknown>;
   message_text: string;
   ai_analysis?: AiAnalysisDetail | null;
 }
@@ -72,10 +71,16 @@ interface AdminReportItem {
   updated_at?: string;
 }
 
+interface PaginatedResponse<T> {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 interface AdminReportDetail extends AdminReportItem {
   age_range?: string | null;
-  message_text: string;
-  emotional_form: Record<string, unknown>;
   ai_analysis?: AiAnalysisDetail | null;
   psychological_review?: {
     validated_risk: string;
@@ -394,7 +399,7 @@ function BarChart({
 
 export default function Aplicacion() {
   const [session, setSession] = useState<Session | null>(() => {
-    const raw = localStorage.getItem('safeschool_session');
+    const raw = sessionStorage.getItem('safeschool_session');
     return raw ? (JSON.parse(raw) as Session) : null;
   });
   const [screen, setScreen] = useState<'public' | 'login' | 'psychologist' | 'admin'>('public');
@@ -402,13 +407,13 @@ export default function Aplicacion() {
 
   useEffect(() => {
     if (!session) return;
-    localStorage.setItem('safeschool_session', JSON.stringify(session));
+    sessionStorage.setItem('safeschool_session', JSON.stringify(session));
     const isAdmin = session.usuario.rol === 'ADMIN_DIRECTOR' || session.usuario.rol === 'admin';
     setScreen(isAdmin ? 'admin' : 'psychologist');
   }, [session]);
 
   const logout = () => {
-    localStorage.removeItem('safeschool_session');
+    sessionStorage.removeItem('safeschool_session');
     setSession(null);
     setScreen('public');
   };
@@ -1095,6 +1100,9 @@ function AdminPanel({
   const [adminStatusFilter, setAdminStatusFilter] = useState('ALL');
   const [adminAiFilter, setAdminAiFilter] = useState('ALL');
   const [adminSearch, setAdminSearch] = useState('');
+  const [adminReportsPage, setAdminReportsPage] = useState(1);
+  const [adminReportsLimit, setAdminReportsLimit] = useState(10);
+  const [adminReportsMeta, setAdminReportsMeta] = useState({ total: 0, totalPages: 1 });
 
   const load = useCallback(async () => {
     setError('');
@@ -1103,16 +1111,30 @@ function AdminPanel({
         api<Record<string, unknown>>('/dashboard/summary', token),
         api<MetricMap>('/dashboard/grade-statistics', token),
         api<PreventiveActivityItem[]>('/preventive-activities', token),
-        api<AdminReportItem[]>('/dashboard/reports', token),
+        api<AdminReportItem[] | PaginatedResponse<AdminReportItem>>(
+          `/dashboard/reports?page=${adminReportsPage}&limit=${adminReportsLimit}`,
+          token,
+        ),
         api<InternalUserItem[]>('/users', token),
       ]);
       setSummary(summaryData);
       setGradeStats(gradeData);
       setActivities(activityData);
-      setAdminReports(reportsData);
+      if (Array.isArray(reportsData)) {
+        setAdminReports(reportsData);
+        setAdminReportsMeta({
+          total: reportsData.length,
+          totalPages: Math.max(Math.ceil(reportsData.length / adminReportsLimit), 1),
+        });
+      } else {
+        setAdminReports(reportsData.items);
+        setAdminReportsMeta({ total: reportsData.total, totalPages: reportsData.totalPages });
+      }
       setUsers(usersData);
       const currentStillExists = selectedAdminReportId
-        ? reportsData.some((report) => report.id === selectedAdminReportId)
+        ? (Array.isArray(reportsData) ? reportsData : reportsData.items).some(
+            (report) => report.id === selectedAdminReportId,
+          )
         : false;
       if (!currentStillExists) {
         setSelectedAdminReportId(null);
@@ -1121,7 +1143,7 @@ function AdminPanel({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudo cargar el panel administrativo.');
     }
-  }, [selectedAdminReportId, token]);
+  }, [adminReportsLimit, adminReportsPage, selectedAdminReportId, token]);
 
   const openAdminReport = useCallback(async (reportId: string) => {
     setSelectedAdminReportId(reportId);
@@ -1174,6 +1196,10 @@ function AdminPanel({
   useEffect(() => {
     void load();
   }, [token]);
+
+  useEffect(() => {
+    void load();
+  }, [adminReportsLimit, adminReportsPage]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1372,7 +1398,41 @@ function AdminPanel({
       <section className="panel admin-report-sidebar">
         <div className="section-head">
           <h2>Reportes anónimos</h2>
-          <span>{filteredAdminReports.length} de {adminReports.length}</span>
+          <span>
+            {filteredAdminReports.length} de {adminReportsMeta.total} | pagina {adminReportsPage} de {adminReportsMeta.totalPages}
+          </span>
+        </div>
+        <div className="filter-bar admin-filter-bar">
+          <label>
+            Items por pagina
+            <select
+              value={adminReportsLimit}
+              onChange={(event) => {
+                setAdminReportsPage(1);
+                setAdminReportsLimit(Number(event.target.value));
+              }}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+            </select>
+          </label>
+          <div className="actions">
+            <button
+              type="button"
+              disabled={adminReportsPage <= 1}
+              onClick={() => setAdminReportsPage((value) => Math.max(value - 1, 1))}
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              disabled={adminReportsPage >= adminReportsMeta.totalPages}
+              onClick={() => setAdminReportsPage((value) => value + 1)}
+            >
+              Siguiente
+            </button>
+          </div>
         </div>
         <div className="filter-bar admin-filter-bar">
           <label>
@@ -1467,10 +1527,6 @@ function AdminPanel({
                 {riskLabel(selectedAdminReport.risk)}
               </strong>
             </div>
-            <div className="detail-section report-description-section">
-              <h3>Descripción del reporte</h3>
-              <p className="message-box">{selectedAdminReport.message_text}</p>
-            </div>
             <div className="detail-meta-grid">
               <div>
                 <span>Grado</span>
@@ -1499,15 +1555,11 @@ function AdminPanel({
             </div>
 
             <div className="detail-section">
-              <h3>Datos emocionales</h3>
-              <div className="detail-meta-grid">
-                {Object.entries(selectedAdminReport.emotional_form ?? {}).map(([key, value]) => (
-                  <div key={key}>
-                    <span>{translateMetricLabel(key)}</span>
-                    <strong>{formatDetailValue(value)}</strong>
-                  </div>
-                ))}
-              </div>
+              <h3>Datos reservados</h3>
+              <p className="muted">
+                La informacion sensible completa queda reservada para psicologia autorizada.
+                Este panel muestra solo el resumen seguro y la trazabilidad operativa.
+              </p>
             </div>
 
             <div className="detail-section">

@@ -44,29 +44,22 @@ export class InMemoryReportsRepository implements ReportsRepository {
     return Promise.resolve(derivation);
   }
 
-  deleteReport(id: string): Promise<void> {
-    const removeByReportId = <T extends { reportId: string }>(items: T[]) => {
-      for (let index = items.length - 1; index >= 0; index -= 1) {
-        if (items[index].reportId === id) {
-          items.splice(index, 1);
-        }
-      }
-    };
-
-    for (let index = this.store.reports.length - 1; index >= 0; index -= 1) {
-      if (this.store.reports[index].id === id) {
-        this.store.reports.splice(index, 1);
-      }
+  archiveReport(id: string, actorId: string, reason: string): Promise<AnonymousReport> {
+    const report = this.store.reports.find((item) => item.id === id);
+    if (!report) {
+      return Promise.reject(new Error('Reporte anonimo no encontrado'));
     }
-    removeByReportId(this.store.analyses);
-    removeByReportId(this.store.reviews);
-    removeByReportId(this.store.derivations);
-    return Promise.resolve();
+
+    const archived = report.archive(actorId, reason);
+    const index = this.store.reports.findIndex((item) => item.id === id);
+    this.store.reports[index] = archived;
+    return Promise.resolve(archived);
   }
 
   claimPendingAnalysisJobs(limit: number): Promise<AnonymousReport[]> {
     const candidates = this.store.reports
       .filter((report) => (report.analysisQueueStatus ?? 'PENDING') === 'PENDING')
+      .filter((report) => (report.archiveStatus ?? 'ACTIVE') === 'ACTIVE')
       .filter((report) => (report.analysisAttempts ?? 0) < 10)
       .filter((report) => {
         if (!report.analysisNextAttemptAt) return true;
@@ -95,18 +88,34 @@ export class InMemoryReportsRepository implements ReportsRepository {
   }
 
   list(filters?: ReportFilters): Promise<ReportAggregate[]> {
+    const aggregates = this.filteredAggregates(filters);
+    const page = Math.max(Number(filters?.page ?? 1) || 1, 1);
+    const defaultLimit = aggregates.length > 0 ? aggregates.length : 50;
+    const limit = Math.min(
+      Math.max(Number(filters?.limit ?? defaultLimit) || defaultLimit, 1),
+      100,
+    );
+    if (!filters?.page && !filters?.limit) {
+      return Promise.resolve(aggregates);
+    }
+    const start = (page - 1) * limit;
+    return Promise.resolve(aggregates.slice(start, start + limit));
+  }
+
+  count(filters?: ReportFilters): Promise<number> {
+    return Promise.resolve(this.filteredAggregates(filters).length);
+  }
+
+  private filteredAggregates(filters?: ReportFilters): ReportAggregate[] {
     const aggregates = this.store.reports
       .filter((report) => !filters?.status || report.status === filters.status)
+      .filter((report) => (report.archiveStatus ?? 'ACTIVE') === 'ACTIVE')
       .filter((report) => !filters?.dateFrom || report.createdAt >= filters.dateFrom)
       .filter((report) => !filters?.dateTo || report.createdAt <= filters.dateTo)
       .map((report) => this.aggregate(report))
       .filter((item) => !filters?.risk || item.review?.validatedRisk === filters.risk || item.analysis?.riskAi === filters.risk)
       .filter((item) => !filters?.dominantEmotion || item.analysis?.dominantEmotion === filters.dominantEmotion);
-    return Promise.resolve(aggregates);
-  }
-
-  count(): Promise<number> {
-    return Promise.resolve(this.store.reports.length);
+    return aggregates;
   }
 
   private aggregate(report: AnonymousReport): ReportAggregate {

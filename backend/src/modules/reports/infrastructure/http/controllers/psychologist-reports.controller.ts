@@ -4,6 +4,7 @@ import { Rol } from '../../../../../shared/domain/enums/rol.enum';
 import { ProtegerRuta } from '../../../../../shared/infrastructure/auth/proteger-ruta.decorator';
 import { UsuarioAutenticado } from '../../../../../shared/infrastructure/auth/usuario-autenticado.interface';
 import {
+  ArchiveReportDto,
   DeriveReportDto,
   ProcessAnalysisQueueDto,
   ReportFiltersDto,
@@ -27,6 +28,8 @@ export class PsychologistReportsController {
       dominantEmotion: filters.dominant_emotion,
       dateFrom: filters.date_from ? new Date(filters.date_from) : undefined,
       dateTo: filters.date_to ? new Date(filters.date_to) : undefined,
+      page: filters.page,
+      limit: filters.limit,
     });
   }
 
@@ -73,9 +76,13 @@ export class PsychologistReportsController {
     return this.reportsUseCases.derive(id, dto, this.actor(request));
   }
 
-  @Delete(':id')
-  delete(@Param('id') id: string, @Req() request: RequestWithUser) {
-    return this.reportsUseCases.delete(id, this.actor(request));
+  @Patch(':id/archive')
+  archive(
+    @Param('id') id: string,
+    @Body() dto: ArchiveReportDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.reportsUseCases.archive(id, dto.reason, this.actor(request));
   }
 
   private actor(request: RequestWithUser) {

@@ -49,6 +49,7 @@ DATABASE_SSL=false
 AI_SERVICE_URL=http://127.0.0.1:8000/analyze
 AI_SERVICE_TIMEOUT_MS=7000
 AI_SERVICE_REQUIRED=false
+AI_INTERNAL_API_KEY=
 PUBLIC_REPORT_RATE_LIMIT_WINDOW_MS=60000
 PUBLIC_REPORT_RATE_LIMIT_MAX=10
 REPORT_AI_QUEUE_CONCURRENCY=2
@@ -142,6 +143,31 @@ npm --prefix frontend run build
 - Auditoria no guarda `message_text`, password ni observaciones internas completas.
 - IA local: no se envia texto anonimo a APIs externas.
 - El endpoint anonimo tiene rate limiting en memoria.
+
+## Endurecimiento aplicado
+
+- `DATABASE_SYNC=false` por defecto.
+- `SWAGGER_ENABLED=false` en production.
+- `AI_EXTERNAL_ALLOWED=false` y `GEMINI_ENABLED=false` por defecto.
+- `AI_INTERNAL_API_KEY` protege el intercambio entre backend y `ai-service`.
+- `GET /api/v1/salud/db` valida la disponibilidad de PostgreSQL cuando la base esta habilitada.
+- `GET /api/v1/salud/ai` refleja el estado configurado del servicio IA.
+- Cada respuesta HTTP incluye `X-Request-Id` para trazabilidad.
+- El frontend deja de usar `localStorage` para la sesion y usa `sessionStorage`.
+- El detalle administrativo deja de exponer `message_text` y `emotional_form`.
+- Los reportes se archivan con trazabilidad en lugar de borrarse fisicamente.
+- Los scripts raiz ya no dependen de PowerShell.
+- `backend/dist` fue retirado del control de versiones.
+
+## Scripts raiz
+
+- `npm run dev`
+- `npm run dev:stop`
+- `npm run dev:ia`
+- `npm run build`
+- `npm run test`
+
+Los scripts raiz usan Node.js para orquestacion local y mantienen compatibilidad cross-platform cuando las dependencias estan instaladas.
 
 ## Cobertura HU-01 a HU-24
 

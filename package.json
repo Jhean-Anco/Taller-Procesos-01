@@ -1,10 +1,10 @@
 {
   "scripts": {
     "instalar:todo": "npm install --prefix backend && npm install --prefix frontend",
-    "instalar:ia": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/instalar-ia.ps1",
-    "dev": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1",
-    "dev:stop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/detener-dev.ps1",
-    "dev:ia": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/servicio-ia.ps1",
+    "instalar:ia": "node scripts/instalar-ia.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:stop": "node scripts/detener-dev.mjs",
+    "dev:ia": "node scripts/servicio-ia.mjs",
     "seed:carga-masiva": "node backend/scripts/seed-reportes-masivos.mjs",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
