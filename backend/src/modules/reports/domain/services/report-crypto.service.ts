@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  scryptSync,
+} from 'node:crypto';
 
 interface CipherPayload {
   keyId: string;
@@ -27,15 +32,24 @@ export class ReportCryptoService {
 
   decrypt(payload: string | null | undefined): string {
     if (!payload) return '';
-    const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8')) as CipherPayload;
-    const iv = Buffer.from(decoded.iv, 'base64');
-    const authTag = Buffer.from(decoded.authTag, 'base64');
-    const decipher = createDecipheriv('aes-256-gcm', this.masterKey, iv);
-    decipher.setAuthTag(authTag);
-    return Buffer.concat([
-      decipher.update(Buffer.from(decoded.ciphertext, 'base64')),
-      decipher.final(),
-    ]).toString('utf8');
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(payload, 'base64').toString('utf8'),
+      ) as CipherPayload;
+      if (!decoded?.iv || !decoded?.authTag || !decoded?.ciphertext) {
+        throw new Error('Invalid payload');
+      }
+      const iv = Buffer.from(decoded.iv, 'base64');
+      const authTag = Buffer.from(decoded.authTag, 'base64');
+      const decipher = createDecipheriv('aes-256-gcm', this.masterKey, iv);
+      decipher.setAuthTag(authTag);
+      return Buffer.concat([
+        decipher.update(Buffer.from(decoded.ciphertext, 'base64')),
+        decipher.final(),
+      ]).toString('utf8');
+    } catch {
+      throw new Error('No fue posible descifrar el contenido protegido');
+    }
   }
 
   private resolveMasterKey(): Buffer {
@@ -46,6 +60,13 @@ export class ReportCryptoService {
       }
       return scryptSync('safeschool-dev-report-key', 'safeschool-report-salt', 32);
     }
-    return Buffer.from(secret, secret.length === 64 ? 'hex' : 'base64');
+    if (/^[a-f0-9]{64}$/i.test(secret)) {
+      return Buffer.from(secret, 'hex');
+    }
+    const decoded = Buffer.from(secret, 'base64');
+    if (decoded.length !== 32) {
+      throw new Error('REPORTS_DATA_KEY invalida');
+    }
+    return decoded;
   }
 }

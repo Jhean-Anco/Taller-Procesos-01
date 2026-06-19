@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import {
   ApiBearerAuth,
@@ -16,6 +16,7 @@ import { RutaPublica } from '../../../../../../shared/infrastructure/auth/ruta-p
 import { UsuarioAutenticado } from '../../../../../../shared/infrastructure/auth/usuario-autenticado.interface';
 import { RUTAS_API } from '../../../../../../shared/infrastructure/http/rutas-api.constantes';
 import { ApiRespuestaOk } from '../../../../../../shared/infrastructure/http/swagger/api-respuesta.decorator';
+import { InvalidCredentialsError } from '../../../../application/errors/auth.errors';
 
 type RequestConSesion = Request & {
   usuario?: UsuarioAutenticado;
@@ -49,7 +50,16 @@ export class AuthController {
     @Body() body: LoginDto,
     @Req() request: RequestConSesion,
   ): Promise<{ accessToken: string; usuario: UsuarioAutenticado }> {
-    const respuesta = await this.authService.login(body);
+    let respuesta;
+    try {
+      respuesta = await this.authService.login(body);
+    } catch (error) {
+      if (error instanceof InvalidCredentialsError) {
+        throw new UnauthorizedException('Credenciales invalidas');
+      }
+
+      throw error;
+    }
 
     // Si el cliente acepta cookies, además del JWT se deja una sesión HTTP activa.
     if (request.session) {

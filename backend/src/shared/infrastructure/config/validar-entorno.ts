@@ -11,6 +11,40 @@ const entornosPermitidos = new Set([
 ]);
 const valorBooleanoValido = new Set(['true', 'false']);
 
+function normalizarClaveHexOBase64(valor: string | undefined): string | undefined {
+  if (!valor?.trim()) return undefined;
+  return valor.trim();
+}
+
+function esHex64(valor: string): boolean {
+  return /^[a-f0-9]{64}$/i.test(valor);
+}
+
+function esBase64Valido(valor: string): boolean {
+  if (valor.length < 44) return false;
+  try {
+    return Buffer.from(valor, 'base64').length === 32;
+  } catch {
+    return false;
+  }
+}
+
+function validarClaveSegura(nombre: string, valor: string | undefined, errores: string[]) {
+  if (!valor) {
+    errores.push(`${nombre} es obligatoria en production`);
+    return;
+  }
+  if (valor.length < 32) {
+    errores.push(`${nombre} debe tener al menos 32 caracteres en production`);
+    return;
+  }
+  if (nombre === 'REPORTS_DATA_KEY' && !(esHex64(valor) || esBase64Valido(valor))) {
+    errores.push(
+      'REPORTS_DATA_KEY debe ser una clave hex de 64 caracteres o base64 equivalente a 32 bytes',
+    );
+  }
+}
+
 export function validarEntorno(config: EntornoPlano): EntornoPlano {
   const errores: string[] = [];
   const nodeEnv = config.NODE_ENV ?? 'development';
@@ -51,7 +85,8 @@ export function validarEntorno(config: EntornoPlano): EntornoPlano {
     REPORT_AI_QUEUE_TICK_MS: config.REPORT_AI_QUEUE_TICK_MS ?? '500',
     REPORT_AI_QUEUE_MAX_RETRIES: config.REPORT_AI_QUEUE_MAX_RETRIES ?? '10',
     ANONYMITY_MIN_GROUP_SIZE: config.ANONYMITY_MIN_GROUP_SIZE ?? '3',
-    REPORTS_DATA_KEY: config.REPORTS_DATA_KEY,
+    AI_INTERNAL_API_KEY: normalizarClaveHexOBase64(config.AI_INTERNAL_API_KEY),
+    REPORTS_DATA_KEY: normalizarClaveHexOBase64(config.REPORTS_DATA_KEY),
     REPORTS_DATA_KEY_ID: config.REPORTS_DATA_KEY_ID,
   };
 
@@ -193,12 +228,16 @@ export function validarEntorno(config: EntornoPlano): EntornoPlano {
     if ((entornoValidado.GEMINI_ENABLED ?? 'true') !== 'false') {
       errores.push('GEMINI_ENABLED debe ser false en production');
     }
-    if (!entornoValidado.AI_INTERNAL_API_KEY) {
-      errores.push('AI_INTERNAL_API_KEY es obligatoria en production');
-    }
-    if (!entornoValidado.REPORTS_DATA_KEY) {
-      errores.push('REPORTS_DATA_KEY es obligatoria en production');
-    }
+    validarClaveSegura(
+      'AI_INTERNAL_API_KEY',
+      entornoValidado.AI_INTERNAL_API_KEY,
+      errores,
+    );
+    validarClaveSegura(
+      'REPORTS_DATA_KEY',
+      entornoValidado.REPORTS_DATA_KEY,
+      errores,
+    );
   }
 
   if (errores.length > 0) {

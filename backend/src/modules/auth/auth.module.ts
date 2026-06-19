@@ -3,7 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 import { AuditModule } from '../audit/audit.module';
+import { AuditService } from '../audit/application/use-cases/audit.service';
 import { UsersModule } from '../users/users.module';
+import { USERS_REPOSITORY, UsersRepository } from '../users/domain/repositories/users.repository';
+import { PASSWORD_HASHER, PasswordHasherPort } from '../users/application/ports/password-hasher.port';
 import { ModuloIa } from '../../contexts/ia/infrastructure/ia.module';
 import { ModuloConvivencia } from '../../contexts/convivencia/infrastructure/convivencia.module';
 import { AuthUseCases } from './application/use-cases/auth.use-cases';
@@ -36,9 +39,32 @@ import { JwtTokenSignerAdapter } from './infrastructure/security/jwt-token-signe
   ],
   controllers: [AuthController],
   providers: [
-    AuthUseCases,
     JwtTokenSignerAdapter,
     LegacyConvivenciaAuthFallbackAdapter,
+    {
+      provide: AuthUseCases,
+      useFactory: (
+        usersRepository: UsersRepository,
+        passwordHasher: PasswordHasherPort,
+        tokenSigner: JwtTokenSignerAdapter,
+        legacyFallback: LegacyConvivenciaAuthFallbackAdapter,
+        auditService: AuditService,
+      ) =>
+        new AuthUseCases(
+          usersRepository,
+          passwordHasher,
+          tokenSigner,
+          legacyFallback,
+          auditService,
+        ),
+      inject: [
+        USERS_REPOSITORY,
+        PASSWORD_HASHER,
+        TOKEN_SIGNER,
+        LEGACY_AUTH_FALLBACK,
+        AuditService,
+      ],
+    },
     { provide: TOKEN_SIGNER, useExisting: JwtTokenSignerAdapter },
     {
       provide: LEGACY_AUTH_FALLBACK,

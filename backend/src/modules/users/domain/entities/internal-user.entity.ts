@@ -56,6 +56,10 @@ export class InternalUser {
       ...this.props,
       ...data,
       email: data.email?.toLowerCase() ?? this.props.email,
+      tokenVersion:
+        data.role && data.role !== this.props.role
+          ? this.props.tokenVersion + 1
+          : this.props.tokenVersion,
       updatedAt: new Date(),
     });
   }

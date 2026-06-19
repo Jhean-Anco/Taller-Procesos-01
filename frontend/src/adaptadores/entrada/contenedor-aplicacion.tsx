@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react';
-import { IniciarSesionServicio } from '../../aplicacion/casos-uso/iniciar-sesion.servicio';
 import { FiltroAlertasDto } from '../../aplicacion/dto/filtro-alertas.dto';
 import { RegistrarEncuestaDto } from '../../aplicacion/dto/registrar-encuesta.dto';
-import { GestionarAlertasServicio } from '../../aplicacion/casos-uso/gestionar-alertas.servicio';
-import { GestionarIncidenciasAdministrativasServicio } from '../../aplicacion/casos-uso/gestionar-incidencias-administrativas.servicio';
-import { GestionarEncuestasServicio } from '../../aplicacion/casos-uso/gestionar-encuestas.servicio';
-import { ObtenerPanelServicio } from '../../aplicacion/casos-uso/obtener-panel.servicio';
-import { ClienteApi } from '../salida/api/cliente-api';
-import { SesionLocal } from '../salida/almacenamiento/sesion-local';
 import { BarraNavegacion } from './componentes/barra-navegacion';
 import { AlertasPagina } from './paginas/alertas.pagina';
 import { EncuestaPagina } from './paginas/encuesta.pagina';
@@ -19,20 +12,12 @@ import { SesionEntidad } from '../../dominio/entidades/sesion.entidad';
 import { InicioSesionPagina } from './paginas/inicio-sesion.pagina';
 import { IncidenciasAdministrativasPagina } from './paginas/incidencias-administrativas.pagina';
 import { PanelPagina } from './paginas/panel.pagina';
-
-const clienteApi = new ClienteApi();
-const iniciarSesion = new IniciarSesionServicio(clienteApi);
-const gestionarIncidenciasAdministrativas =
-  new GestionarIncidenciasAdministrativasServicio(clienteApi);
-const gestionarEncuestas = new GestionarEncuestasServicio(clienteApi);
-const gestionarAlertas = new GestionarAlertasServicio(clienteApi);
-const obtenerPanel = new ObtenerPanelServicio(clienteApi);
-const sesionLocal = new SesionLocal();
+import { dependenciasAplicacion } from '../../bootstrap/dependencias-aplicacion';
 
 export function ContenedorAplicacion() {
   const [pestanaActiva, setPestanaActiva] = useState('encuestas');
   const [cargando, setCargando] = useState(true);
-  const [sesion, setSesion] = useState<SesionEntidad | null>(sesionLocal.obtener());
+  const [sesion, setSesion] = useState<SesionEntidad | null>(dependenciasAplicacion.sesionLocal.obtener());
   const [panel, setPanel] = useState<PanelEntidad | null>(null);
   const [encuestas, setEncuestas] = useState<EncuestaEmocionalEntidad[]>([]);
   const [alertas, setAlertas] = useState<AlertaEntidad[]>([]);
@@ -54,14 +39,14 @@ export function ContenedorAplicacion() {
     try {
       if (sesion.usuario.rol === 'administrativo') {
         const [panelActual, incidenciasActuales] = await Promise.all([
-          obtenerPanel.ejecutar(),
-          gestionarIncidenciasAdministrativas.listar(filtrosAlerta),
+          dependenciasAplicacion.obtenerPanel.ejecutar(),
+          dependenciasAplicacion.gestionarIncidenciasAdministrativas.listar(filtrosAlerta),
         ]);
         setPanel(panelActual);
         setAlertas(incidenciasActuales);
         setEncuestas([]);
       } else if (sesion.usuario.rol === 'psicologo') {
-        const alertasActuales = await gestionarAlertas.listar(filtrosAlerta);
+        const alertasActuales = await dependenciasAplicacion.gestionarAlertas.listar(filtrosAlerta);
         setAlertas(alertasActuales);
         setPanel(null);
         setEncuestas([]);
@@ -72,7 +57,7 @@ export function ContenedorAplicacion() {
       }
     } catch (errorCapturado) {
       if (errorCapturado instanceof Error && errorCapturado.message.includes('401')) {
-        sesionLocal.limpiar();
+        dependenciasAplicacion.sesionLocal.limpiar();
         setSesion(null);
       }
       setError(
@@ -87,7 +72,7 @@ export function ContenedorAplicacion() {
 
   useEffect(() => {
     if (sesion?.tokenAcceso) {
-      sesionLocal.guardar(sesion);
+      dependenciasAplicacion.sesionLocal.guardar(sesion);
     }
   }, [sesion]);
 
@@ -102,8 +87,8 @@ export function ContenedorAplicacion() {
     setCargando(true);
     setError('');
     try {
-      const sesionNueva = await iniciarSesion.ejecutar(credenciales);
-      sesionLocal.guardar(sesionNueva);
+      const sesionNueva = await dependenciasAplicacion.iniciarSesion.ejecutar(credenciales);
+      dependenciasAplicacion.sesionLocal.guardar(sesionNueva);
       setSesion(sesionNueva);
       setMostrarAccesoInterno(false);
       setPestanaActiva(
@@ -123,7 +108,7 @@ export function ContenedorAplicacion() {
   };
 
   const cerrarSesion = () => {
-    sesionLocal.limpiar();
+    dependenciasAplicacion.sesionLocal.limpiar();
     setSesion(null);
     setPanel(null);
     setEncuestas([]);
@@ -133,14 +118,14 @@ export function ContenedorAplicacion() {
   };
 
   const registrarEncuesta = async (datos: RegistrarEncuestaDto) => {
-    await gestionarEncuestas.registrar(datos);
+    await dependenciasAplicacion.gestionarEncuestas.registrar(datos);
     await cargar();
   };
 
   const actualizarAlerta = async (id: string, estado: EstadoAlerta) => {
-    await gestionarAlertas.actualizar(id, { estado });
+    await dependenciasAplicacion.gestionarAlertas.actualizar(id, { estado });
     if (historiaAlerta?.alerta.id === id) {
-      setHistoriaAlerta(await gestionarAlertas.obtenerHistoria(id));
+      setHistoriaAlerta(await dependenciasAplicacion.gestionarAlertas.obtenerHistoria(id));
     }
     await cargar();
   };
@@ -150,21 +135,21 @@ export function ContenedorAplicacion() {
   };
 
   const seleccionarHistoriaAlerta = async (id: string) => {
-    setHistoriaAlerta(await gestionarAlertas.obtenerHistoria(id));
+    setHistoriaAlerta(await dependenciasAplicacion.gestionarAlertas.obtenerHistoria(id));
   };
 
   const registrarSeguimientoAlerta = async (
     id: string,
     datos: { accionGlobal: string; descripcion: string },
   ) => {
-    await gestionarAlertas.registrarSeguimiento(id, datos);
-    setHistoriaAlerta(await gestionarAlertas.obtenerHistoria(id));
+    await dependenciasAplicacion.gestionarAlertas.registrarSeguimiento(id, datos);
+    setHistoriaAlerta(await dependenciasAplicacion.gestionarAlertas.obtenerHistoria(id));
     await cargar();
   };
 
   const seleccionarHistoriaIncidenciaAdministrativa = async (id: string) => {
     setHistoriaAlerta(
-      await gestionarIncidenciasAdministrativas.obtenerHistoria(id),
+      await dependenciasAplicacion.gestionarIncidenciasAdministrativas.obtenerHistoria(id),
     );
   };
 
@@ -178,9 +163,9 @@ export function ContenedorAplicacion() {
       estado: 'pendiente' | 'en_proceso' | 'completado';
     },
   ) => {
-    await gestionarIncidenciasAdministrativas.registrarProceso(id, datos);
+    await dependenciasAplicacion.gestionarIncidenciasAdministrativas.registrarProceso(id, datos);
     setHistoriaAlerta(
-      await gestionarIncidenciasAdministrativas.obtenerHistoria(id),
+      await dependenciasAplicacion.gestionarIncidenciasAdministrativas.obtenerHistoria(id),
     );
     await cargar();
   };
@@ -193,10 +178,10 @@ export function ContenedorAplicacion() {
       estado: 'pendiente' | 'en_proceso' | 'completado';
     },
   ) => {
-    await gestionarIncidenciasAdministrativas.registrarAvance(procesoId, datos);
+    await dependenciasAplicacion.gestionarIncidenciasAdministrativas.registrarAvance(procesoId, datos);
     if (historiaAlerta) {
       setHistoriaAlerta(
-        await gestionarIncidenciasAdministrativas.obtenerHistoria(
+        await dependenciasAplicacion.gestionarIncidenciasAdministrativas.obtenerHistoria(
           historiaAlerta.alerta.id,
         ),
       );

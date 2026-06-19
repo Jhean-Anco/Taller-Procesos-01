@@ -45,8 +45,13 @@ export class GuardiaAutenticacion implements CanActivate {
       if (!usuarioActual || !usuarioActual.active) {
         throw new UnauthorizedException('El usuario ya no esta activo');
       }
+      if ((usuarioSesion.tokenVersion ?? -1) !== usuarioActual.tokenVersion) {
+        delete request.session?.usuario;
+        throw new UnauthorizedException('La sesion fue revocada');
+      }
       request.usuario = {
         ...usuarioSesion,
+        rol: usuarioActual.role as unknown as UsuarioAutenticado['rol'],
         tokenVersion: usuarioActual.tokenVersion,
       };
       return true;

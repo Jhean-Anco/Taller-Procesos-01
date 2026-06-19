@@ -8,7 +8,10 @@
     "start": "node dist/principal.js",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/principal.js",
-    "db:reset-data": "node ./scripts/reset-db.mjs",
+    "db:migrate": "node ./scripts/reset-db.mjs --migrate-only",
+    "db:seed:dev": "node ./scripts/seed-reportes-masivos.mjs",
+    "db:reset:dev": "node ./scripts/reset-db.mjs --reset-dev --confirm",
+    "architecture:check": "node ../scripts/architecture-check.mjs backend",
     "test": "jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand"
   },

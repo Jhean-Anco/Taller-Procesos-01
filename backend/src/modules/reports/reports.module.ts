@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlertsModule } from '../alerts/alerts.module';
+import { AlertsService } from '../alerts/application/use-cases/alerts.service';
 import { AuditModule } from '../audit/audit.module';
+import { AuditService } from '../audit/application/use-cases/audit.service';
 import { MemoryStoreModule } from '../shared/infrastructure/memory/memory-store.module';
 import { ReportsUseCases } from './application/use-cases/reports.use-cases';
 import { AI_ANALYZER } from './application/ports/ai-analyzer.port';
 import { REPORTS_REPOSITORY } from './domain/repositories/reports.repository';
+import { ReportCryptoService } from './domain/services/report-crypto.service';
 import { PythonAiClientAdapter } from './infrastructure/ai/python-ai-client.adapter';
 import { AnonymousReportsController } from './infrastructure/http/controllers/anonymous-reports.controller';
 import { PsychologistReportsController } from './infrastructure/http/controllers/psychologist-reports.controller';
@@ -37,7 +40,7 @@ const databaseEnabled = process.env.DATABASE_ENABLED === 'true';
   ],
   controllers: [AnonymousReportsController, PsychologistReportsController],
   providers: [
-    ReportsUseCases,
+    ReportCryptoService,
     PythonAiClientAdapter,
     PublicReportRateLimitGuard,
     ...(databaseEnabled ? [TypeOrmReportsRepository] : [InMemoryReportsRepository]),
@@ -50,6 +53,22 @@ const databaseEnabled = process.env.DATABASE_ENABLED === 'true';
     {
       provide: AI_ANALYZER,
       useExisting: PythonAiClientAdapter,
+    },
+    {
+      provide: ReportsUseCases,
+      useFactory: (
+        reportsRepository: unknown,
+        aiAnalyzer: PythonAiClientAdapter,
+        alertsService: AlertsService,
+        auditService: AuditService,
+      ) =>
+        new ReportsUseCases(
+          reportsRepository as never,
+          aiAnalyzer,
+          alertsService,
+          auditService,
+        ),
+      inject: [REPORTS_REPOSITORY, AI_ANALYZER, AlertsService, AuditService],
     },
   ],
   exports: [ReportsUseCases, REPORTS_REPOSITORY],

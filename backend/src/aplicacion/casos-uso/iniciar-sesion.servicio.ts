@@ -18,7 +18,8 @@ export class IniciarSesionServicio implements IniciarSesionCasoUso {
 
   async ejecutar(dto: IniciarSesionDto): Promise<RespuestaSesionDto> {
     const nombreUsuario = dto.nombreUsuario.trim().toUpperCase();
-    const usuario = await this.repositorioUsuario.obtenerPorNombreUsuario(nombreUsuario);
+    const usuario =
+      await this.repositorioUsuario.obtenerPorNombreUsuario(nombreUsuario);
 
     if (!usuario) {
       throw new UnauthorizedException('Credenciales invalidas');

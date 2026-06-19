@@ -1,4 +1,3 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService } from '../../../audit/application/use-cases/audit.service';
 import { PreventiveActivityStatus } from '../../../shared/domain/enums';
 import { generarIdSeguro } from '../../../shared/domain/id-generator';
@@ -11,11 +10,10 @@ import {
   CreatePreventiveActivityDto,
   UpdatePreventiveActivityDto,
 } from '../dtos/activity.dtos';
+import { ActivityNotFoundError } from '../errors/activities.errors';
 
-@Injectable()
 export class ActivitiesService {
   constructor(
-    @Inject(ACTIVITIES_REPOSITORY)
     private readonly activitiesRepository: ActivitiesRepository,
     private readonly auditService: AuditService,
   ) {}
@@ -101,7 +99,7 @@ export class ActivitiesService {
   private async get(id: string): Promise<PreventiveActivity> {
     const activity = await this.activitiesRepository.findById(id);
     if (!activity) {
-      throw new NotFoundException('Actividad preventiva no encontrada');
+      throw new ActivityNotFoundError();
     }
     return activity;
   }

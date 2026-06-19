@@ -25,7 +25,6 @@ export class ModuloIa {
         : [],
       controllers: [IaControlador],
       providers: [
-        IaService,
         AdaptadorProveedorIaLocal,
         ...(habilitado
           ? [RepositorioRegistroSolicitudTypeOrm]
@@ -40,6 +39,18 @@ export class ModuloIa {
           useExisting: habilitado
             ? RepositorioRegistroSolicitudTypeOrm
             : RepositorioRegistroSolicitudMemoria,
+        },
+        {
+          provide: IaService,
+          useFactory: (
+            proveedorIa: unknown,
+            repositorioRegistroSolicitud: unknown,
+          ) =>
+            new IaService(
+              proveedorIa as never,
+              repositorioRegistroSolicitud as never,
+            ),
+          inject: [PUERTO_PROVEEDOR_IA, REPOSITORIO_REGISTRO_SOLICITUD],
         },
       ],
       exports: [IaService],

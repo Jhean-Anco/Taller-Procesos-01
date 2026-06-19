@@ -38,19 +38,13 @@ export class ReportPresenter {
     };
 
     for (const signal of signals) {
-      if (signal.startsWith('explicacion::')) {
-        metadata.explanation = signal.slice('explicacion::'.length).trim() || null;
-        continue;
+      if (signal.startsWith('explicacion::')) continue;
+      if (signal.startsWith('accion::')) continue;
+      if (signal.startsWith('resumen::')) continue;
+      const allowed = this.translateSignal(signal);
+      if (allowed !== signal.replace(/_/g, ' ')) {
+        metadata.visibleSignals.push(allowed);
       }
-      if (signal.startsWith('accion::')) {
-        metadata.recommendedAction = signal.slice('accion::'.length).trim() || null;
-        continue;
-      }
-      if (signal.startsWith('resumen::')) {
-        metadata.contextSummary = signal.slice('resumen::'.length).trim() || null;
-        continue;
-      }
-      metadata.visibleSignals.push(signal);
     }
 
     return metadata;
@@ -77,9 +71,9 @@ export class ReportPresenter {
       relevant_signals: metadata.visibleSignals.map((signal) =>
         this.translateSignal(signal),
       ),
-      explanation: metadata.explanation,
-      recommended_action: metadata.recommendedAction,
-      context_summary: metadata.contextSummary,
+      explanation: 'Se identificaron indicadores anonimizados que requieren revision humana.',
+      recommended_action: 'Mantener revision psicologica y seguimiento institucional.',
+      context_summary: 'Resumen anonimo sin fragmentos recuperables del mensaje original.',
       model_version: aggregate.analysis.modelVersion,
       note: 'Clasificacion preliminar generada por IA; requiere revision humana.',
     };
@@ -170,7 +164,7 @@ export class ReportPresenter {
         ) ?? false,
       summary:
         aggregate.derivation?.nonSensitiveSummary ??
-        this.privacy.buildNonSensitiveSummary(aggregate.report.messageText),
+        'Resumen anonimo disponible solo para supervision autorizada.',
       created_at: aggregate.report.createdAt.toISOString(),
       updated_at: aggregate.report.updatedAt.toISOString(),
     };
@@ -199,9 +193,7 @@ export class ReportPresenter {
           ? aggregate.report.analysisRequestedAt.toISOString()
           : null,
       },
-      sensitive_data: {
-        available_only_for_psychologist: true,
-      },
+      sensitive_data: { available_only_for_psychologist: true },
     };
   }
 }

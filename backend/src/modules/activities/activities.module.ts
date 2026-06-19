@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditModule } from '../audit/audit.module';
+import { AuditService } from '../audit/application/use-cases/audit.service';
 import { MemoryStoreModule } from '../shared/infrastructure/memory/memory-store.module';
 import { ActivitiesService } from './application/use-cases/activities.service';
 import { ACTIVITIES_REPOSITORY } from './domain/repositories/activities.repository';
@@ -19,13 +20,18 @@ const databaseEnabled = process.env.DATABASE_ENABLED === 'true';
   ],
   controllers: [PreventiveActivitiesController],
   providers: [
-    ActivitiesService,
     ...(databaseEnabled ? [TypeOrmActivitiesRepository] : [InMemoryActivitiesRepository]),
     {
       provide: ACTIVITIES_REPOSITORY,
       useExisting: databaseEnabled
         ? TypeOrmActivitiesRepository
         : InMemoryActivitiesRepository,
+    },
+    {
+      provide: ActivitiesService,
+      useFactory: (activitiesRepository: unknown, auditService: AuditService) =>
+        new ActivitiesService(activitiesRepository as never, auditService),
+      inject: [ACTIVITIES_REPOSITORY, AuditService],
     },
   ],
   exports: [ActivitiesService, ACTIVITIES_REPOSITORY],

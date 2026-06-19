@@ -17,13 +17,17 @@ const databaseEnabled = process.env.DATABASE_ENABLED === 'true';
   ],
   controllers: [AlertsController],
   providers: [
-    AlertsService,
     ...(databaseEnabled ? [TypeOrmAlertsRepository] : [InMemoryAlertsRepository]),
     {
       provide: ALERTS_REPOSITORY,
       useExisting: databaseEnabled
         ? TypeOrmAlertsRepository
         : InMemoryAlertsRepository,
+    },
+    {
+      provide: AlertsService,
+      useFactory: (alertsRepository: unknown) => new AlertsService(alertsRepository as never),
+      inject: [ALERTS_REPOSITORY],
     },
   ],
   exports: [AlertsService, ALERTS_REPOSITORY],

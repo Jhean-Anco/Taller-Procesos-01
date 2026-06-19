@@ -21,6 +21,8 @@ export interface AnonymousReportProps {
   analysisNextAttemptAt?: Date | null;
   analysisLastError?: string | null;
   analysisRequestedAt?: Date;
+  analysisWorkerId?: string | null;
+  analysisAcquiredAt?: Date | null;
   archivedAt?: Date | null;
   archivedBy?: string | null;
   archiveReason?: string | null;
@@ -100,6 +102,14 @@ export class AnonymousReport {
     return this.props.analysisRequestedAt;
   }
 
+  get analysisWorkerId(): string | null | undefined {
+    return this.props.analysisWorkerId;
+  }
+
+  get analysisAcquiredAt(): Date | null | undefined {
+    return this.props.analysisAcquiredAt;
+  }
+
   get archivedAt(): Date | null | undefined {
     return this.props.archivedAt;
   }
@@ -138,6 +148,8 @@ export class AnonymousReport {
       analysisQueueStatus: 'PROCESSING',
       analysisAttempts: (this.props.analysisAttempts ?? 0) + 1,
       analysisLastError: null,
+      analysisWorkerId: this.props.analysisWorkerId ?? 'worker-local',
+      analysisAcquiredAt: new Date(),
       updatedAt: new Date(),
     });
   }
@@ -148,6 +160,7 @@ export class AnonymousReport {
       analysisQueueStatus: 'COMPLETED',
       analysisNextAttemptAt: null,
       analysisLastError: null,
+      analysisWorkerId: this.props.analysisWorkerId ?? null,
       updatedAt: new Date(),
     });
   }
@@ -171,6 +184,7 @@ export class AnonymousReport {
       analysisQueueStatus: exhausted ? 'FAILED' : 'PENDING',
       analysisNextAttemptAt: exhausted ? null : retryAt,
       analysisLastError: errorMessage,
+      analysisWorkerId: this.props.analysisWorkerId ?? null,
       updatedAt: new Date(),
     });
   }

@@ -75,32 +75,34 @@ export class TypeOrmReportsRepository implements ReportsRepository {
 
   async claimPendingAnalysisJobs(limit: number): Promise<AnonymousReport[]> {
     const now = new Date();
-    const candidates = await this.reports
-      .createQueryBuilder('report')
-      .where('report.analysisQueueStatus = :pending', { pending: 'PENDING' })
-      .andWhere('report.analysisAttempts < :maxAttempts', { maxAttempts: 10 })
-      .andWhere(
-        '(report.analysisNextAttemptAt IS NULL OR report.analysisNextAttemptAt <= :now)',
-        { now },
-      )
-      .orderBy('report.analysisRequestedAt', 'ASC')
-      .take(limit)
-      .getMany();
+    return this.reports.manager.transaction(async (manager) => {
+      const rows = await manager
+        .createQueryBuilder(AnonymousReportOrmEntity, 'report')
+        .setLock('pessimistic_write')
+        .setOnLocked('skip_locked')
+        .where('report.analysisQueueStatus = :pending', { pending: 'PENDING' })
+        .andWhere('report.analysisAttempts < :maxAttempts', { maxAttempts: 10 })
+        .andWhere(
+          '(report.analysisNextAttemptAt IS NULL OR report.analysisNextAttemptAt <= :now)',
+          { now },
+        )
+        .orderBy('report.analysisRequestedAt', 'ASC')
+        .take(limit)
+        .getMany();
 
-    const acquired: AnonymousReport[] = [];
-    for (const report of candidates) {
-      if ((report.analysisAttempts ?? 0) >= 10) {
-        continue;
+      const acquired: AnonymousReport[] = [];
+      for (const report of rows) {
+        report.analysisQueueStatus = 'PROCESSING';
+        report.analysisAttempts = (report.analysisAttempts ?? 0) + 1;
+        report.analysisLastError = null;
+        report.analysisWorkerId = process.env.HOSTNAME ?? 'worker-local';
+        report.analysisAcquiredAt = now;
+        report.updatedAt = new Date();
+        const saved = await manager.save(AnonymousReportOrmEntity, report);
+        acquired.push(this.reportToDomain(saved));
       }
-      report.analysisQueueStatus = 'PROCESSING';
-      report.analysisAttempts = (report.analysisAttempts ?? 0) + 1;
-      report.analysisLastError = null;
-      report.updatedAt = new Date();
-      const saved = await this.reports.save(report);
-      acquired.push(this.reportToDomain(saved));
-    }
-
-    return acquired;
+      return acquired;
+    });
   }
 
   async findById(id: string): Promise<ReportAggregate | null> {
@@ -179,6 +181,8 @@ export class TypeOrmReportsRepository implements ReportsRepository {
       analysisNextAttemptAt: entity.analysisNextAttemptAt,
       analysisLastError: entity.analysisLastError,
       analysisRequestedAt: entity.analysisRequestedAt,
+      analysisWorkerId: entity.analysisWorkerId ?? null,
+      analysisAcquiredAt: entity.analysisAcquiredAt ?? null,
       archivedAt: entity.archivedAt,
       archivedBy: entity.archivedBy,
       archiveReason: entity.archiveReason,
@@ -259,12 +263,9 @@ export class TypeOrmReportsRepository implements ReportsRepository {
       typeof limitRaw === 'number' || typeof limitRaw === 'string'
         ? Math.min(Math.max(Number(limitRaw) || 50, 1), 100)
         : null;
-    const queryOptions = {
-      where,
-      order: { createdAt: 'DESC' } as const,
-      ...(limit ? { skip: (page - 1) * limit, take: limit } : {}),
-    };
-    const [reports, total] = await this.reports.findAndCount(queryOptions);
+    const qb = this.reports.createQueryBuilder('report').where(where).orderBy('report.createdAt', 'DESC');
+    const total = await qb.clone().getCount();
+    const reports = limit ? await qb.skip((page - 1) * limit).take(limit).getMany() : await qb.getMany();
     return { reports, total };
   }
 }

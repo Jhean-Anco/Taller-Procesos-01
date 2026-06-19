@@ -17,11 +17,15 @@ const databaseEnabled = process.env.DATABASE_ENABLED === 'true';
   ],
   controllers: [AuditController],
   providers: [
-    AuditService,
     ...(databaseEnabled ? [TypeOrmAuditRepository] : [InMemoryAuditRepository]),
     {
       provide: AUDIT_REPOSITORY,
       useExisting: databaseEnabled ? TypeOrmAuditRepository : InMemoryAuditRepository,
+    },
+    {
+      provide: AuditService,
+      useFactory: (auditRepository: unknown) => new AuditService(auditRepository as never),
+      inject: [AUDIT_REPOSITORY],
     },
   ],
   exports: [AuditService, AUDIT_REPOSITORY],

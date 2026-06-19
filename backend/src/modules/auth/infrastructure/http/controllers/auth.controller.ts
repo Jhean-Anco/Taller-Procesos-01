@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuditService } from './../../../../audit/application/use-cases/audit.service';
 import { RutaPublica } from '../../../../../shared/infrastructure/auth/ruta-publica.decorator';
 import { UsuarioAutenticado } from '../../../../../shared/infrastructure/auth/usuario-autenticado.interface';
 import { LoginDto } from '../../../application/dtos/auth.dtos';
 import { AuthUseCases } from '../../../application/use-cases/auth.use-cases';
+import { InvalidCredentialsError, LoginRateLimitExceededError } from '../../../application/errors/auth.errors';
 
 type RequestWithSession = Request & {
   usuario?: UsuarioAutenticado;
@@ -41,6 +42,12 @@ export class AuthController {
       }
       return response;
     } catch (error) {
+      if (error instanceof LoginRateLimitExceededError) {
+        throw new HttpException(error.message, HttpStatus.TOO_MANY_REQUESTS);
+      }
+      if (error instanceof InvalidCredentialsError) {
+        throw new UnauthorizedException(error.message);
+      }
       await this.auditService.register({
         action: 'LOGIN_FAILED',
         entityType: 'user',

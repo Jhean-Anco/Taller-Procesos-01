@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Query } from '@nestjs/common';
 import { Rol } from '../../../../../shared/domain/enums/rol.enum';
 import { ProtegerRuta } from '../../../../../shared/infrastructure/auth/proteger-ruta.decorator';
 import { AlertsService } from '../../../application/use-cases/alerts.service';
 import { AlertFiltersDto, UpdateAlertStatusDto } from '../../../application/dtos/alert.dtos';
+import { AlertNotFoundError } from '../../../application/errors/alerts.errors';
 
 @Controller({ path: 'alerts', version: '1' })
 @ProtegerRuta(Rol.PSYCHOLOGIST, Rol.ADMIN_DIRECTOR)
@@ -10,7 +11,7 @@ export class AlertsController {
   constructor(private readonly alertsService: AlertsService) {}
 
   @Get()
-  list(@Query() filters: AlertFiltersDto) {
+  async list(@Query() filters: AlertFiltersDto) {
     return this.alertsService.list({
       status: filters.status,
       riskLevel: filters.risk_level,
@@ -18,12 +19,27 @@ export class AlertsController {
   }
 
   @Get(':id')
-  get(@Param('id') id: string) {
-    return this.alertsService.get(id);
+  async get(@Param('id') id: string) {
+    try {
+      return await this.alertsService.get(id);
+    } catch (error) {
+      this.translate(error);
+    }
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateAlertStatusDto) {
-    return this.alertsService.updateStatus(id, dto.status);
+  async updateStatus(@Param('id') id: string, @Body() dto: UpdateAlertStatusDto) {
+    try {
+      return await this.alertsService.updateStatus(id, dto.status);
+    } catch (error) {
+      this.translate(error);
+    }
+  }
+
+  private translate(error: unknown): never {
+    if (error instanceof AlertNotFoundError) {
+      throw new NotFoundException(error.message);
+    }
+    throw error instanceof Error ? error : new BadRequestException('Error inesperado');
   }
 }

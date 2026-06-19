@@ -3,17 +3,21 @@ import { PUERTO_VERIFICACION_SALUD } from '../application/ports/output/verificac
 import { SaludService } from '../application/services/salud.service';
 import { SaludControlador } from './adapters/input/http/salud.controller';
 import { AdaptadorSaludSistema } from './adapters/output/salud-sistema.adapter';
-import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [],
   controllers: [SaludControlador],
   providers: [
-    SaludService,
     AdaptadorSaludSistema,
     {
       provide: PUERTO_VERIFICACION_SALUD,
       useExisting: AdaptadorSaludSistema,
+    },
+    {
+      provide: SaludService,
+      useFactory: (puertoVerificacionSalud: unknown) =>
+        new SaludService(puertoVerificacionSalud as never),
+      inject: [PUERTO_VERIFICACION_SALUD],
     },
   ],
 })
