@@ -1,15 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import bcrypt from 'bcrypt';
 import { Client } from 'pg';
 
 const scriptsRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const backendRoot = dirname(scriptsRoot);
-const defaultMigrationPath = join(
-  backendRoot,
-  'migrations',
-  '001_pmv_alertas_tempranas.sql',
-);
+const defaultMigrationsDir = join(backendRoot, 'migrations');
 
 export function readEnvFile(filePath) {
   try {
@@ -73,7 +70,49 @@ export async function ensureDatabaseExists(config) {
   }
 }
 
-export async function applySchema(client, migrationPath = defaultMigrationPath) {
-  const sql = readFileSync(migrationPath, 'utf8');
-  await client.query(sql);
+export async function applySchema(client, migrationsDir = defaultMigrationsDir) {
+  const migrations = readdirSync(migrationsDir)
+    .filter((file) => /^\d+_.*\.sql$/i.test(file) && !file.endsWith('.rollback.sql'))
+    .sort((a, b) => a.localeCompare(b));
+
+  for (const migration of migrations) {
+    const sql = readFileSync(join(migrationsDir, migration), 'utf8');
+    await client.query(sql);
+  }
+}
+
+export async function seedBootstrapUsers(client, env) {
+  const users = [
+    {
+      id: 'usr_bootstrap_admin_local',
+      name: env.BOOTSTRAP_ADMIN_NAME ?? 'Administrador Local',
+      email: env.BOOTSTRAP_ADMIN_EMAIL,
+      password: env.BOOTSTRAP_ADMIN_PASSWORD,
+      role: 'ADMIN_DIRECTOR',
+    },
+    {
+      id: 'usr_bootstrap_psychologist_local',
+      name: env.BOOTSTRAP_PSYCHOLOGIST_NAME ?? 'Psicologia Local',
+      email: env.BOOTSTRAP_PSYCHOLOGIST_EMAIL,
+      password: env.BOOTSTRAP_PSYCHOLOGIST_PASSWORD,
+      role: 'PSYCHOLOGIST',
+    },
+  ].filter((user) => user.email && user.password);
+
+  for (const user of users) {
+    const passwordHash = await bcrypt.hash(user.password, 10);
+    await client.query(
+      `
+        INSERT INTO users (id, name, email, password_hash, role, active, token_version, created_at, updated_at)
+        VALUES ($1, $2, lower($3), $4, $5, true, 0, now(), now())
+        ON CONFLICT (email) DO UPDATE
+        SET name = EXCLUDED.name,
+            password_hash = EXCLUDED.password_hash,
+            role = EXCLUDED.role,
+            active = true,
+            updated_at = now();
+      `,
+      [user.id, user.name, user.email, passwordHash, user.role],
+    );
+  }
 }

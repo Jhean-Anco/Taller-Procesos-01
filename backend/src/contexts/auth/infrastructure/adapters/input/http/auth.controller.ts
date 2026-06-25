@@ -52,7 +52,10 @@ export class AuthController {
   ): Promise<{ accessToken: string; usuario: UsuarioAutenticado }> {
     let respuesta;
     try {
-      respuesta = await this.authService.login(body);
+      respuesta = await this.authService.login({
+        ...body,
+        correo: body.correo ?? body.email ?? '',
+      });
     } catch (error) {
       if (error instanceof InvalidCredentialsError) {
         throw new UnauthorizedException('Credenciales invalidas');

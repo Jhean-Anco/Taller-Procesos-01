@@ -45,11 +45,6 @@ export class DashboardController {
     return this.dashboardService.trends();
   }
 
-  @Get('grade-statistics')
-  gradeStatistics() {
-    return this.dashboardService.byGrade();
-  }
-
   @Get('reports')
   reports(@Query('page') page?: string, @Query('limit') limit?: string) {
     return this.reportsUseCases.listForAdminSafe({

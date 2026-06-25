@@ -1,17 +1,25 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { openSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import net from 'node:net';
 
 const raiz = process.cwd();
 const runtime = join(raiz, '.runtime');
 mkdirSync(runtime, { recursive: true });
+const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 function setDefaultEnv(name, value) {
   if (!process.env[name]) process.env[name] = value;
 }
 
 setDefaultEnv('DATABASE_ENABLED', 'true');
+setDefaultEnv('NODE_ENV', 'development');
+setDefaultEnv('JWT_SECRET', 'dev_jwt_secret_safeschool_ai_local_32_chars_min');
+setDefaultEnv('SESSION_SECRET', 'dev_session_secret_safeschool_ai_local_32_chars_min');
+setDefaultEnv('BOOTSTRAP_ADMIN_EMAIL', 'admin@safeschool.test');
+setDefaultEnv('BOOTSTRAP_ADMIN_PASSWORD', 'admin-local-password');
+setDefaultEnv('BOOTSTRAP_PSYCHOLOGIST_EMAIL', 'psicologo@safeschool.test');
+setDefaultEnv('BOOTSTRAP_PSYCHOLOGIST_PASSWORD', 'psicologo-local-password');
 setDefaultEnv('DATABASE_HOST', 'localhost');
 setDefaultEnv('DATABASE_PORT', '5432');
 setDefaultEnv('DATABASE_USERNAME', 'postgres');
@@ -48,8 +56,20 @@ async function startIfMissing(name, port, command, args, options = {}) {
   } catch {}
 
   const pidFile = join(runtime, `${name}.pid`);
-  const out = options.out ?? 'pipe';
-  const child = spawn(command, args, { cwd: raiz, shell: false, detached: true, stdio: ['ignore', out, out] });
+  const outPath = join(runtime, `${name}.log`);
+  const errPath = join(runtime, `${name}.error.log`);
+  const stdio = options.stdio ?? [
+    'ignore',
+    openSync(outPath, 'a'),
+    openSync(errPath, 'a'),
+  ];
+  const isWindows = process.platform === 'win32';
+  const child = spawn(command, args, {
+    cwd: raiz,
+    shell: isWindows,
+    detached: true,
+    stdio,
+  });
   writeFileSync(pidFile, String(child.pid));
   child.unref();
   console.log(`Iniciando ${name}...`);
@@ -59,8 +79,8 @@ async function main() {
   await startIfMissing('ia', 8000, 'node', ['scripts/servicio-ia.mjs']);
   console.log('Ejecutando migraciones de la BD antes de iniciar backend...');
   await run('node', ['backend/scripts/reset-db.mjs', '--migrate-only']);
-  await startIfMissing('backend', 3000, 'npm', ['--prefix', 'backend', 'run', 'dev']);
-  await startIfMissing('frontend', 5173, 'npm', ['--prefix', 'frontend', 'run', 'dev', '--', '--host', '127.0.0.1', '--port', '5173']);
+  await startIfMissing('backend', 3000, npmBin, ['--prefix', 'backend', 'run', 'dev']);
+  await startIfMissing('frontend', 5173, npmBin, ['--prefix', 'frontend', 'run', 'dev', '--', '--host', '127.0.0.1', '--port', '5173']);
   console.log('Sistema listo:');
   console.log('  Frontend: http://127.0.0.1:5173');
   console.log('  Backend : http://127.0.0.1:3000');

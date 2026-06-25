@@ -36,16 +36,15 @@ describe('PMV alertas tempranas (e2e)', () => {
     const reportResponse = await request(app.getHttpServer())
       .post('/api/v1/anonymous-reports')
       .send({
-        grade_reference: 'secundaria-3',
-        section_reference: 'B',
-        age_range: '12-14',
         emotional_form: {
-          fear: true,
-          anxiety: true,
-          isolation: true,
+          fear: false,
+          sadness: false,
+          anxiety: false,
+          isolation: false,
+          school_insecurity: false,
         },
         message_text:
-          'Tengo miedo porque se burlan de mi y me siento solo durante los recreos.',
+          'Me cuesta participar en algunas actividades porque siento que mis opiniones no son tomadas en cuenta por el grupo.',
         consent_accepted: true,
       })
       .expect(201);
@@ -56,15 +55,15 @@ describe('PMV alertas tempranas (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/v1/anonymous-reports')
       .send({
-        grade_reference: 'secundaria-4',
-        section_reference: 'A',
-        age_range: '15-17',
         emotional_form: {
+          fear: true,
           sadness: true,
+          anxiety: true,
+          isolation: false,
           school_insecurity: true,
         },
         message_text:
-          'Me siento triste y prefiero no participar porque varios companeros me insultan.',
+          'Tengo miedo de salir al recreo porque algunos companeros me amenazan y siento mucha ansiedad al ingresar al colegio.',
         consent_accepted: true,
       })
       .expect(201);
@@ -102,7 +101,7 @@ describe('PMV alertas tempranas (e2e)', () => {
         }>
       ).data.ai_analysis,
     ).toMatchObject({
-      risk_ai: 'MEDIUM',
+      risk_ai: 'LOW',
       model_version: 'typescript-safety-fallback',
     });
 

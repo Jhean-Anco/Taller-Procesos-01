@@ -52,9 +52,6 @@ END $$;
 CREATE TABLE IF NOT EXISTS anonymous_reports (
   id VARCHAR(64) PRIMARY KEY,
   public_code VARCHAR(40) NOT NULL UNIQUE,
-  grade_reference VARCHAR(40),
-  section_reference VARCHAR(20),
-  age_range VARCHAR(30),
   emotional_form JSONB NOT NULL DEFAULT '{}'::jsonb,
   emotional_form_ciphertext TEXT,
   message_text TEXT NOT NULL,
@@ -297,25 +294,6 @@ LANGUAGE sql
 AS $$
   WITH counts AS (
     SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS label, COUNT(*)::int AS total
-    FROM anonymous_reports
-    GROUP BY 1
-  )
-  SELECT
-    label AS metric_label,
-    CASE
-      WHEN total < min_group_size THEN 'datos insuficientes para proteger anonimato'
-      ELSE total::text
-    END AS metric_value
-  FROM counts
-  ORDER BY label;
-$$;
-
-CREATE OR REPLACE FUNCTION sp_dashboard_estadisticas_grado(min_group_size INTEGER DEFAULT 3)
-RETURNS TABLE (metric_label TEXT, metric_value TEXT)
-LANGUAGE sql
-AS $$
-  WITH counts AS (
-    SELECT COALESCE(NULLIF(grade_reference, ''), 'SIN_DATO') AS label, COUNT(*)::int AS total
     FROM anonymous_reports
     GROUP BY 1
   )

@@ -77,13 +77,6 @@ export class DashboardService {
     );
   }
 
-  async byGrade() {
-    const reports = await this.reportsRepository.list();
-    return this.protectSmallGroups(
-      this.countBy(reports, (item) => item.report.gradeReference ?? 'SIN_DATO'),
-    );
-  }
-
   private risk(item: ReportAggregate): RiskLevel | null {
     return item.review?.validatedRisk ?? item.analysis?.riskAi ?? null;
   }

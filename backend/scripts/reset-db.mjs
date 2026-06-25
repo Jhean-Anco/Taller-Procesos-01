@@ -6,6 +6,7 @@ import {
   ensureDatabaseExists,
   readEnvFile,
   resolveDatabaseConfig,
+  seedBootstrapUsers,
 } from './lib/database-setup.mjs';
 
 const args = new Set(process.argv.slice(2));
@@ -24,6 +25,7 @@ if (migrateOnly) {
   try {
     await client.connect();
     await applySchema(client);
+    await seedBootstrapUsers(client, env);
     console.log('Migraciones aplicadas.');
   } finally {
     await client.end().catch(() => {});
@@ -82,6 +84,7 @@ try {
     console.log(`Base vaciada. Tablas reiniciadas: ${tables.length}.`);
   }
   await applySchema(client);
+  await seedBootstrapUsers(client, env);
 } finally {
   await client.end().catch(() => {});
 }

@@ -5,12 +5,23 @@ export interface Session {
   usuario: { id: string; nombre: string; correo: string; rol: Role };
 }
 
+export interface EmotionalFormPayload {
+  fear: boolean;
+  sadness: boolean;
+  anxiety: boolean;
+  isolation: boolean;
+  school_insecurity: boolean;
+}
+
+export interface AnonymousReportPayload {
+  emotional_form: EmotionalFormPayload;
+  message_text: string;
+  consent_accepted: true;
+}
+
 export interface ReportListItem {
   id: string;
   public_code: string;
-  grade_reference?: string | null;
-  section_reference?: string | null;
-  age_range?: string | null;
   status: string;
   dominant_emotion?: string | null;
   risk_ai?: string | null;
@@ -52,8 +63,6 @@ export interface AlertItem {
 export interface AdminReportItem {
   id: string;
   public_code: string;
-  grade_reference?: string | null;
-  section_reference?: string | null;
   status: string;
   dominant_emotion?: string | null;
   risk?: string | null;
@@ -73,7 +82,6 @@ export interface PaginatedResponse<T> {
 }
 
 export interface AdminReportDetail extends AdminReportItem {
-  age_range?: string | null;
   ai_analysis?: AiAnalysisDetail | null;
   psychological_review?: {
     validated_risk: string;
@@ -119,4 +127,3 @@ export interface InternalUserItem {
   created_at: string;
   updated_at: string;
 }
-

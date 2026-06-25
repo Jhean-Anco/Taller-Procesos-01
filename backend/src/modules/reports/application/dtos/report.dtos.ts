@@ -15,22 +15,8 @@ import { ReportStatus, RiskLevel } from '../../../shared/domain/enums';
 
 export class CreateAnonymousReportDto {
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  grade_reference?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  section_reference?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(30)
-  age_range?: string;
-
   @IsObject()
-  emotional_form!: Record<string, unknown>;
+  emotional_form?: Record<string, unknown>;
 
   @IsString()
   @MinLength(10)

@@ -37,10 +37,6 @@ describe('TypeOrmReportsRepository', () => {
     const report = {
       id: 'rep_1',
       publicCode: 'PUB-1',
-      gradeReference: 'secundaria-3',
-      sectionReference: 'A',
-      ageRange: '12-14',
-      emotionalForm: { fear: true },
       messageText: 'Mensaje sensible',
       consentAccepted: true,
       status: ReportStatus.PENDING,
@@ -52,10 +48,6 @@ describe('TypeOrmReportsRepository', () => {
       toPrimitives: () => ({
         id: 'rep_1',
         publicCode: 'PUB-1',
-        gradeReference: 'secundaria-3',
-        sectionReference: 'A',
-        ageRange: '12-14',
-        emotionalForm: { fear: true },
         messageText: 'Mensaje sensible',
         consentAccepted: true,
         status: ReportStatus.PENDING,
@@ -76,17 +68,14 @@ describe('TypeOrmReportsRepository', () => {
     } as never;
 
     const orm = (repository as any).reportToOrm(report);
-    expect(orm.emotionalFormCiphertext).toBeTruthy();
     expect(orm.messageTextCiphertext).toBeTruthy();
 
     const roundtrip = (repository as any).reportToDomain({
       ...orm,
-      emotionalFormCiphertext: orm.emotionalFormCiphertext,
       messageTextCiphertext: orm.messageTextCiphertext,
     } as AnonymousReportOrmEntity);
 
     expect(roundtrip.messageText).toBe('Mensaje sensible');
-    expect(roundtrip.emotionalForm).toEqual({ fear: true });
   });
 
   it('marca trabajos pendientes como processing dentro de la transaccion', async () => {
@@ -95,10 +84,6 @@ describe('TypeOrmReportsRepository', () => {
     const report = {
       id: 'rep_1',
       publicCode: 'PUB-1',
-      gradeReference: null,
-      sectionReference: null,
-      ageRange: null,
-      emotionalFormCiphertext: crypto.encrypt(JSON.stringify({ fear: true })),
       messageTextCiphertext: crypto.encrypt('hola'),
       consentAccepted: true,
       status: ReportStatus.PENDING,
