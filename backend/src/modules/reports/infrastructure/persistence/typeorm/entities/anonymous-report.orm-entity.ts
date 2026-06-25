@@ -9,17 +9,11 @@ export class AnonymousReportOrmEntity {
   @Column('varchar', { name: 'public_code', length: 40, unique: true })
   publicCode!: string;
 
-  @Column('varchar', { name: 'grade_reference', length: 40, nullable: true })
-  gradeReference!: string | null;
+  @Column('jsonb', { name: 'emotional_form', default: {} })
+  emotionalForm!: Record<string, unknown>;
 
-  @Column('varchar', { name: 'section_reference', length: 20, nullable: true })
-  sectionReference!: string | null;
-
-  @Column('varchar', { name: 'age_range', length: 30, nullable: true })
-  ageRange!: string | null;
-
-  @Column('text', { name: 'emotional_form_ciphertext', nullable: true })
-  emotionalFormCiphertext!: string | null;
+  @Column('text', { name: 'message_text' })
+  messageText!: string;
 
   @Column('text', { name: 'message_text_ciphertext', nullable: true })
   messageTextCiphertext!: string | null;

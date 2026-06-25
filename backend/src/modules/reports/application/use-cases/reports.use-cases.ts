@@ -46,10 +46,7 @@ export class ReportsUseCases {
       new AnonymousReport({
         id: generarIdSeguro('rep'),
         publicCode: generarCodigoReporte(),
-        gradeReference: dto.grade_reference ?? null,
-        sectionReference: dto.section_reference ?? null,
-        ageRange: dto.age_range ?? null,
-        emotionalForm: dto.emotional_form,
+        emotionalForm: dto.emotional_form ?? {},
         messageText: dto.message_text.trim(),
         consentAccepted: true,
         status: ReportStatus.PENDING,

@@ -106,9 +106,6 @@ export class ReportPresenter {
     return {
       id: aggregate.report.id,
       public_code: aggregate.report.publicCode,
-      grade_reference: aggregate.report.gradeReference,
-      section_reference: aggregate.report.sectionReference,
-      age_range: aggregate.report.ageRange,
       status: aggregate.report.status,
       dominant_emotion: this.translateEmotion(aggregate.analysis?.dominantEmotion ?? null),
       risk_ai: aggregate.analysis?.riskAi ?? null,
@@ -127,7 +124,6 @@ export class ReportPresenter {
   psychologistDetail(aggregate: ReportAggregate) {
     return {
       ...this.psychologistList(aggregate),
-      emotional_form: aggregate.report.emotionalForm,
       message_text: aggregate.report.messageText,
       ai_analysis: this.buildAiAnalysis(aggregate),
       psychological_review: aggregate.review
@@ -151,9 +147,6 @@ export class ReportPresenter {
     return {
       id: aggregate.report.id,
       public_code: aggregate.report.publicCode,
-      grade_reference: aggregate.report.gradeReference,
-      section_reference: aggregate.report.sectionReference,
-      age_range: aggregate.report.ageRange,
       status: aggregate.report.status,
       dominant_emotion: this.translateEmotion(aggregate.analysis?.dominantEmotion ?? null),
       risk: aggregate.review?.validatedRisk ?? aggregate.analysis?.riskAi ?? null,

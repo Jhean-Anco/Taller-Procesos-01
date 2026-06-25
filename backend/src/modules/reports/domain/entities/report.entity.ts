@@ -7,12 +7,8 @@ import {
 export interface AnonymousReportProps {
   id: string;
   publicCode: string;
-  gradeReference?: string | null;
-  sectionReference?: string | null;
-  ageRange?: string | null;
-  emotionalForm: Record<string, unknown>;
+  emotionalForm?: Record<string, unknown>;
   messageText: string;
-  emotionalFormCiphertext?: string | null;
   messageTextCiphertext?: string | null;
   consentAccepted: boolean;
   status: ReportStatus;
@@ -46,28 +42,12 @@ export class AnonymousReport {
     return this.props.publicCode;
   }
 
-  get gradeReference(): string | null | undefined {
-    return this.props.gradeReference;
-  }
-
-  get sectionReference(): string | null | undefined {
-    return this.props.sectionReference;
-  }
-
-  get ageRange(): string | null | undefined {
-    return this.props.ageRange;
+  get messageText(): string {
+    return this.props.messageText;
   }
 
   get emotionalForm(): Record<string, unknown> {
-    return { ...this.props.emotionalForm };
-  }
-
-  get emotionalFormCiphertext(): string | null | undefined {
-    return this.props.emotionalFormCiphertext;
-  }
-
-  get messageText(): string {
-    return this.props.messageText;
+    return { ...(this.props.emotionalForm ?? {}) };
   }
 
   get messageTextCiphertext(): string | null | undefined {
@@ -190,7 +170,7 @@ export class AnonymousReport {
   }
 
   toPrimitives(): AnonymousReportProps {
-    return { ...this.props, emotionalForm: { ...this.props.emotionalForm } };
+    return { ...this.props };
   }
 }
 

@@ -1,8 +1,10 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  AnonymousReportPayload,
   AdminReportDetail,
   AdminReportItem,
   AiAnalysisDetail,
+  EmotionalFormPayload,
   AlertItem,
   InternalUserItem,
   PaginatedResponse,
@@ -18,6 +20,11 @@ import type {
   RiskTier,
   ToastKind,
 } from "./aplicacion/soporte-ui";
+import {
+  buildAnonymousReportPayload,
+  initialEmotionalForm,
+  validateAnonymousReportMessage,
+} from "./aplicacion/reporte-anonimo.formulario";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api/v1";
 const REPORT_REFRESH_MS = Number(
@@ -25,6 +32,38 @@ const REPORT_REFRESH_MS = Number(
 );
 const ORIENTATION =
   "Tu reporte fue enviado de manera anónima. Será revisado por el personal autorizado. Si te encuentras en peligro inmediato, acude a un adulto de confianza o al área responsable de convivencia escolar.";
+
+const emotionalOptions: Array<{
+  key: keyof EmotionalFormPayload;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "fear",
+    label: "Miedo",
+    description: "Sientes temor o alerta por lo ocurrido.",
+  },
+  {
+    key: "sadness",
+    label: "Tristeza",
+    description: "Te sientes decaído, afectado o sin ánimo.",
+  },
+  {
+    key: "anxiety",
+    label: "Ansiedad",
+    description: "Sientes nervios, preocupación o tensión.",
+  },
+  {
+    key: "isolation",
+    label: "Aislamiento",
+    description: "Prefieres apartarte o te dejan fuera del grupo.",
+  },
+  {
+    key: "school_insecurity",
+    label: "Inseguridad dentro del colegio",
+    description: "No te sientes seguro en algún espacio escolar.",
+  },
+];
 
 async function api<T>(
   path: string,
@@ -350,13 +389,18 @@ export default function Aplicacion() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="topbar-copy">
-          <p className="eyebrow">SafeSchool AI</p>
-          <h1>Seguimiento de convivencia escolar</h1>
-          <p className="muted">
-            Seguimiento anónimo, lectura IA y revisión psicológica con foco
-            operativo.
-          </p>
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden="true">
+            A
+          </div>
+          <div className="topbar-copy">
+            <p className="eyebrow">Colegio Agora</p>
+            <h1>Convivencia y bienestar escolar</h1>
+            <p className="muted">
+              Seguimiento anónimo, lectura IA y revisión psicológica con foco
+              operativo.
+            </p>
+          </div>
         </div>
         <nav>
           {!session && (
@@ -394,16 +438,8 @@ export default function Aplicacion() {
 
 function PublicReport() {
   const [message, setMessage] = useState("");
-  const [grade, setGrade] = useState("secundaria-3");
-  const [section, setSection] = useState("A");
-  const [ageRange, setAgeRange] = useState("12-14");
-  const [form, setForm] = useState({
-    fear: false,
-    sadness: false,
-    anxiety: false,
-    isolation: false,
-    school_insecurity: false,
-  });
+  const [emotionalForm, setEmotionalForm] =
+    useState<EmotionalFormPayload>(initialEmotionalForm);
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{
@@ -415,39 +451,42 @@ function PublicReport() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
-    if (!consent) {
-      setError("Debes aceptar el aviso informativo antes de enviar.");
+    const messageValidation = validateAnonymousReportMessage(message);
+    if (!messageValidation.valid) {
+      setError(messageValidation.message);
       return;
     }
+    if (!consent) {
+      setError("Debes aceptar el consentimiento antes de enviar el reporte.");
+      return;
+    }
+    if (loading) return;
     if (
       !window.confirm("¿Enviar este reporte anónimo para revisión autorizada?")
     )
       return;
     setLoading(true);
     try {
+      const payload: AnonymousReportPayload = buildAnonymousReportPayload(
+        emotionalForm,
+        messageValidation.trimmedMessage,
+      );
       const response = await api<{ public_code: string; orientation: string }>(
         "/anonymous-reports",
         undefined,
         {
           method: "POST",
-          body: JSON.stringify({
-            grade_reference: grade,
-            section_reference: section,
-            age_range: ageRange,
-            emotional_form: form,
-            message_text: message,
-            consent_accepted: consent,
-          }),
+          body: JSON.stringify(payload),
         },
       );
       setResult(response);
       setMessage("");
+      setEmotionalForm(initialEmotionalForm);
       setConsent(false);
     } catch (caught) {
+      console.error("Error al enviar reporte anónimo", caught);
       setError(
-        caught instanceof Error
-          ? caught.message
-          : "No se pudo enviar el reporte.",
+        "No pudimos enviar el reporte. Verifica tu conexión e inténtalo nuevamente.",
       );
     } finally {
       setLoading(false);
@@ -470,89 +509,78 @@ function PublicReport() {
   return (
     <main className="public-grid">
       <form className="panel report-form" onSubmit={submit}>
+        <div className="form-brand-strip" aria-hidden="true">
+          <span>Colegio Agora</span>
+          <strong>Canal de cuidado escolar</strong>
+        </div>
         <div>
           <p className="eyebrow">Canal anónimo</p>
-          <h2>Cuentanos que esta pasando</h2>
+          <h2>Cuéntanos qué está ocurriendo</h2>
           <p className="muted">
             No escribas nombres, DNI, telefonos, correos ni direcciones. El
             reporte se usa solo con fines preventivos.
           </p>
         </div>
 
-        <div className="field-grid">
-          <label>
-            Grado referencial
-            <select
-              value={grade}
-              onChange={(event) => setGrade(event.target.value)}
-            >
-              <option value="primaria-5">Primaria 5</option>
-              <option value="primaria-6">Primaria 6</option>
-              <option value="secundaria-1">Secundaria 1</option>
-              <option value="secundaria-2">Secundaria 2</option>
-              <option value="secundaria-3">Secundaria 3</option>
-              <option value="secundaria-4">Secundaria 4</option>
-              <option value="secundaria-5">Secundaria 5</option>
-            </select>
-          </label>
-          <label>
-            Seccion referencial
-            <select
-              value={section}
-              onChange={(event) => setSection(event.target.value)}
-            >
-              <option>A</option>
-              <option>B</option>
-              <option>C</option>
-            </select>
-          </label>
-          <label>
-            Rango de edad
-            <select
-              value={ageRange}
-              onChange={(event) => setAgeRange(event.target.value)}
-            >
-              <option value="9-11">9-11</option>
-              <option value="12-14">12-14</option>
-              <option value="15-17">15-17</option>
-            </select>
-          </label>
-        </div>
-
-        <div className="check-grid">
-          {[
-            ["fear", "Miedo"],
-            ["sadness", "Tristeza"],
-            ["anxiety", "Ansiedad"],
-            ["isolation", "Aislamiento"],
-            ["school_insecurity", "Inseguridad escolar"],
-          ].map(([key, label]) => (
-            <label key={key} className="check-row">
-              <input
-                type="checkbox"
-                checked={form[key as keyof typeof form]}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    [key]: event.target.checked,
-                  }))
-                }
-              />
-              {label}
-            </label>
-          ))}
-        </div>
+        <fieldset className="emotion-section">
+          <legend>¿Cómo te hace sentir esta situación?</legend>
+          <p className="muted">
+            Puedes seleccionar una o varias emociones. Si ninguna opción
+            describe lo que sientes, puedes dejar todas sin marcar.
+          </p>
+          <div className="emotion-grid-options">
+            {emotionalOptions.map((option) => {
+              const checked = emotionalForm[option.key];
+              const inputId = `emotion-${option.key}`;
+              return (
+                <label
+                  key={option.key}
+                  htmlFor={inputId}
+                  className={`emotion-option ${checked ? "is-selected" : ""}`}
+                >
+                  <input
+                    id={inputId}
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(event) =>
+                      setEmotionalForm((current) => ({
+                        ...current,
+                        [option.key]: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span className="emotion-copy">
+                    <strong>{option.label}</strong>
+                    <small>{option.description}</small>
+                  </span>
+                  <span className="selection-state">
+                    {checked ? "Seleccionado" : "Sin seleccionar"}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
 
         <label>
-          Mensaje anónimo
+          Cuéntanos qué está ocurriendo
           <textarea
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            minLength={10}
-            maxLength={4000}
+            minLength={30}
+            maxLength={500}
             required
-            placeholder="Describe como te sientes o que situacion quieres reportar sin identificar personas."
+            placeholder="Describe la situación con tus propias palabras. No incluyas nombres, teléfonos, direcciones ni otros datos que permitan identificarte."
           />
+          <span className="field-help">
+            Tu reporte será tratado de manera confidencial. Evita escribir
+            información personal o identificable.
+          </span>
+          <span
+            className={`character-counter ${message.trim().length > 500 ? "is-invalid" : ""}`}
+          >
+            {message.trim().length} de 500 caracteres. Mínimo 30 caracteres.
+          </span>
         </label>
 
         <label className="consent">
@@ -561,13 +589,13 @@ function PublicReport() {
             checked={consent}
             onChange={(event) => setConsent(event.target.checked)}
           />
-          Acepto que mi reporte anónimo sea revisado por personal autorizado con
-          fines preventivos.
+          He leído la información y acepto enviar este reporte anónimo para que
+          pueda ser revisado por el personal responsable.
         </label>
 
         {error && <p className="error">{error}</p>}
-        <button disabled={loading || message.trim().length < 10}>
-          {loading ? "Enviando..." : "Enviar reporte anónimo"}
+        <button disabled={loading}>
+          {loading ? "Enviando reporte..." : "Enviar reporte anónimo"}
         </button>
       </form>
     </main>
@@ -784,9 +812,6 @@ function PsychologistPanel({
         const textMatches = includesSearch(
           [
             report.public_code,
-            report.grade_reference,
-            report.section_reference,
-            report.age_range,
             report.status,
             report.dominant_emotion,
             riskLabel(
@@ -853,14 +878,6 @@ function PsychologistPanel({
     () => countMetric(filteredReports, (report) => aiStateLabel(report)),
     [filteredReports],
   );
-  const psychologistGradeStats = useMemo<MetricMap>(
-    () =>
-      countMetric(
-        filteredReports,
-        (report) => report.grade_reference ?? "Sin grado",
-      ),
-    [filteredReports],
-  );
 
   return (
     <main className="workspace">
@@ -909,8 +926,8 @@ function PsychologistPanel({
         note="Pendiente, analizada o respaldo"
       />
       <BarChart
-        title="Reportes por grado"
-        data={psychologistGradeStats}
+        title="Reportes por estado"
+        data={psychologistStatusStats}
         note="Distribucion de carga"
       />
 
@@ -989,14 +1006,7 @@ function PsychologistPanel({
             >
               <span className="report-row-main">
                 <strong>{report.public_code}</strong>
-                <small>
-                  {report.grade_reference ?? "sin grado"} /{" "}
-                  {report.section_reference ?? "sin sección"}
-                </small>
-                <small>
-                  {report.age_range ?? "sin edad"} /{" "}
-                  {reportStatusLabel(report.status)}
-                </small>
+                <small>{reportStatusLabel(report.status)}</small>
                 <small>
                   {new Date(report.created_at).toLocaleDateString("es-PE")} /{" "}
                   {report.dominant_emotion ?? "sin emoción"}
@@ -1058,18 +1068,6 @@ function PsychologistPanel({
             </div>
             <p className="message-box">{detail.message_text}</p>
             <div className="detail-meta-grid">
-              <div>
-                <span>Grado</span>
-                <strong>{detail.grade_reference ?? "sin grado"}</strong>
-              </div>
-              <div>
-                <span>Sección</span>
-                <strong>{detail.section_reference ?? "sin sección"}</strong>
-              </div>
-              <div>
-                <span>Edad</span>
-                <strong>{detail.age_range ?? "sin dato"}</strong>
-              </div>
               <div>
                 <span>Estado</span>
                 <strong>{reportStatusLabel(detail.status)}</strong>
@@ -1209,7 +1207,6 @@ function AdminPanel({
   notify: (message: string, kind?: ToastKind) => void;
 }) {
   const [summary, setSummary] = useState<Record<string, unknown>>({});
-  const [gradeStats, setGradeStats] = useState<MetricMap>({});
   const [activities, setActivities] = useState<PreventiveActivityItem[]>([]);
   const [users, setUsers] = useState<InternalUserItem[]>([]);
   const [adminReports, setAdminReports] = useState<AdminReportItem[]>([]);
@@ -1247,10 +1244,9 @@ function AdminPanel({
   const load = useCallback(async () => {
     setError("");
     try {
-      const [summaryData, gradeData, activityData, reportsData, usersData] =
+      const [summaryData, activityData, reportsData, usersData] =
         await Promise.all([
           api<Record<string, unknown>>("/dashboard/summary", token),
-          api<MetricMap>("/dashboard/grade-statistics", token),
           api<PreventiveActivityItem[]>("/preventive-activities", token),
           api<AdminReportItem[] | PaginatedResponse<AdminReportItem>>(
             `/dashboard/reports?page=${adminReportsPage}&limit=${adminReportsLimit}`,
@@ -1259,7 +1255,6 @@ function AdminPanel({
           api<InternalUserItem[]>("/users", token),
         ]);
       setSummary(summaryData);
-      setGradeStats(gradeData);
       setActivities(activityData);
       if (Array.isArray(reportsData)) {
         setAdminReports(reportsData);
@@ -1509,6 +1504,10 @@ function AdminPanel({
     }),
     [summary],
   );
+  const activityStatusStats = useMemo<MetricMap>(
+    () => countMetric(activities, (activity) => reportStatusLabel(activity.status)),
+    [activities],
+  );
   const filteredAdminReports = useMemo(
     () =>
       adminReports.filter((report) => {
@@ -1521,8 +1520,6 @@ function AdminPanel({
         const textMatches = includesSearch(
           [
             report.public_code,
-            report.grade_reference,
-            report.section_reference,
             report.status,
             report.dominant_emotion,
             report.summary,
@@ -1604,9 +1601,9 @@ function AdminPanel({
             note="Procesados, fallback y pendientes"
           />
           <BarChart
-            title="Carga por grado"
-            data={gradeStats}
-            note="Distribucion por grado"
+            title="Actividad preventiva"
+            data={activityStatusStats}
+            note="Distribucion operativa"
           />
         </div>
       </section>
@@ -1714,10 +1711,7 @@ function AdminPanel({
                   <span className="admin-report-line admin-report-line-top">
                     <span>
                       <strong>{report.public_code}</strong>
-                      <small>
-                        {report.grade_reference ?? "sin grado"} /{" "}
-                        {report.section_reference ?? "sin sección"}
-                      </small>
+                      <small>{reportStatusLabel(report.status)}</small>
                     </span>
                     <span className="admin-report-status">
                       <strong className={`risk-chip ${riskTone(report.risk)}`}>
@@ -1787,28 +1781,8 @@ function AdminPanel({
                 </div>
                 <div className="detail-meta-grid">
                   <div>
-                    <span>Grado</span>
-                    <strong>
-                      {selectedAdminReport.grade_reference ?? "sin grado"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Sección</span>
-                    <strong>
-                      {selectedAdminReport.section_reference ?? "sin sección"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Edad</span>
-                    <strong>
-                      {selectedAdminReport.age_range ?? "sin dato"}
-                    </strong>
-                  </div>
-                  <div>
                     <span>Estado</span>
-                    <strong>
-                      {reportStatusLabel(selectedAdminReport.status)}
-                    </strong>
+                    <strong>{reportStatusLabel(selectedAdminReport.status)}</strong>
                   </div>
                   <div>
                     <span>Creado</span>

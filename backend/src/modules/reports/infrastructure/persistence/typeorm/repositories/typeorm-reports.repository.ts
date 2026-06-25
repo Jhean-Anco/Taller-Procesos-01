@@ -150,29 +150,20 @@ export class TypeOrmReportsRepository implements ReportsRepository {
     const primitives = report.toPrimitives();
     return {
       ...primitives,
-      emotionalFormCiphertext: this.crypto.encrypt(JSON.stringify(primitives.emotionalForm ?? {})),
       messageTextCiphertext: this.crypto.encrypt(primitives.messageText),
-      emotionalForm: undefined,
-      messageText: undefined,
+      messageText: primitives.messageText,
     } as AnonymousReportOrmEntity;
   }
 
   private reportToDomain(entity: AnonymousReportOrmEntity): AnonymousReport {
-    const emotionalForm = entity.emotionalFormCiphertext
-      ? JSON.parse(this.crypto.decrypt(entity.emotionalFormCiphertext))
-      : {};
     const messageText = entity.messageTextCiphertext
       ? this.crypto.decrypt(entity.messageTextCiphertext)
       : '';
     return new AnonymousReport({
       id: entity.id,
       publicCode: entity.publicCode,
-      gradeReference: entity.gradeReference,
-      sectionReference: entity.sectionReference,
-      ageRange: entity.ageRange,
-      emotionalForm,
+      emotionalForm: entity.emotionalForm ?? {},
       messageText,
-      emotionalFormCiphertext: entity.emotionalFormCiphertext,
       messageTextCiphertext: entity.messageTextCiphertext,
       consentAccepted: entity.consentAccepted,
       status: entity.status,
